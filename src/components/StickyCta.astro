@@ -1,0 +1,48 @@
+---
+import Icon from './Icon.astro';
+import { site } from '../data/site';
+interface Props {
+  /** Quote CTA target; homepage passes "#quote" to keep visitors on-page. */
+  ctaHref?: string;
+}
+const { ctaHref = '/contact/' } = Astro.props;
+---
+
+<!-- Desktop: right-edge vertical tab -->
+<a
+  href={ctaHref}
+  data-sticky-cta
+  class="font-display fixed right-0 top-1/2 z-40 hidden -translate-y-1/2 origin-bottom-right -rotate-90 rounded-t-lg bg-orange-500 px-5 py-2.5 text-sm font-bold uppercase tracking-wide text-navy-950 shadow-lg transition hover:bg-orange-600 lg:block"
+>
+  Free Quote
+</a>
+
+<!-- Mobile: bottom action bar (call, text, quote) -->
+<div data-sticky-cta class="fixed inset-x-0 bottom-0 z-40 grid grid-cols-3 border-t border-white/10 bg-navy-800/95 backdrop-blur transition lg:hidden">
+  <a href={`tel:${site.phoneRaw}`} class="font-display flex items-center justify-center gap-2 py-3.5 text-sm font-bold uppercase tracking-wide text-white">
+    <Icon name="phone" class="h-5 w-5 text-orange-400" /> Call
+  </a>
+  <a href={`sms:${site.smsRaw}`} class="font-display flex items-center justify-center gap-2 border-x border-white/10 py-3.5 text-sm font-bold uppercase tracking-wide text-white">
+    <Icon name="chat" class="h-5 w-5 text-orange-400" /> Text
+  </a>
+  <a href={ctaHref} class="font-display flex items-center justify-center gap-2 bg-orange-500 py-3.5 text-sm font-bold uppercase tracking-wide text-navy-950">
+    Free Quote
+  </a>
+</div>
+<!-- spacer so the mobile bar never covers footer content -->
+<div class="h-14 lg:hidden" aria-hidden="true"></div>
+
+<script>
+  // Hide the sticky CTAs while the on-page quote form (#quote) is in view;
+  // a CTA pointing at the form the user is already looking at is noise.
+  const quote = document.getElementById('quote');
+  if (quote && 'IntersectionObserver' in window) {
+    const ctas = document.querySelectorAll('[data-sticky-cta]');
+    new IntersectionObserver(([entry]) => {
+      ctas.forEach((el) => {
+        el.classList.toggle('opacity-0', entry.isIntersecting);
+        el.classList.toggle('pointer-events-none', entry.isIntersecting);
+      });
+    }).observe(quote);
+  }
+</script>

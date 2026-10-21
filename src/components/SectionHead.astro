@@ -1,0 +1,26 @@
+---
+// Plan-set sheet title block. Replaces the centered kicker + H2 stacks:
+// [sheet no] KICKER ————————— hairline
+// TITLE
+// intro (slot, max-w-prose)
+interface Props {
+  /** Zero-padded sheet number ("02"). Rationed: major sections only. */
+  no?: string;
+  kicker: string;
+  title?: string;
+  tone?: 'light' | 'dark';
+  class?: string;
+}
+const { no, kicker, title, tone = 'light', class: cls = '' } = Astro.props;
+const dark = tone === 'dark';
+---
+
+<div class={cls}>
+  <div class="flex items-center gap-3">
+    {no && <span class:list={['sheet-no', dark && 'sheet-no-dark']} aria-hidden="true">{no}</span>}
+    <p class:list={['kicker', dark ? 'text-navy-200' : 'text-orange-700']}>{kicker}</p>
+    <span class:list={['h-px flex-1', dark ? 'bg-navy-200/40' : 'bg-navy-600/20']} aria-hidden="true"></span>
+  </div>
+  {title && <h2 class:list={['h-section mt-3', dark && 'text-white']}>{title}</h2>}
+  <slot />
+</div>

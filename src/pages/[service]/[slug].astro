@@ -1,0 +1,17 @@
+---
+import SubServicePage from '../../components/SubServicePage.astro';
+import { serviceContent } from '../../data/serviceContent';
+
+export function getStaticPaths() {
+  return Object.values(serviceContent).flatMap((service) =>
+    service.children.map((sub) => ({
+      params: { service: service.slug, slug: sub.slug },
+      props: { service, sub },
+    }))
+  );
+}
+
+const { service, sub } = Astro.props;
+---
+
+<SubServicePage service={service} sub={sub} />

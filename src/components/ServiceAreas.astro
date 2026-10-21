@@ -1,0 +1,83 @@
+---
+import Icon from './Icon.astro';
+import { site } from '../data/site';
+interface Props {
+  service?: string;
+}
+const { service = 'home improvement' } = Astro.props;
+
+// Rough relative positions for a stylized Central Valley map (x,y in 0..500)
+const pins: Record<string, { x: number; y: number; primary?: boolean }> = {
+  Madera: { x: 150, y: 120 },
+  Fresno: { x: 250, y: 245, primary: true },
+  Clovis: { x: 320, y: 205 },
+  Visalia: { x: 345, y: 390 },
+};
+---
+
+<section class="bg-slate-50 py-16 sm:py-20">
+  <div class="container-x grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
+    <!-- Stylized map -->
+    <div class="overflow-hidden rounded-2xl shadow-md ring-1 ring-slate-200">
+      <svg viewBox="0 0 500 500" class="h-full w-full" role="img" aria-label="Map of our Central Valley service area">
+        <rect width="500" height="500" fill="#1a3860" />
+        <g stroke="#3a5a86" stroke-width="2" opacity="0.7">
+          <line x1="60" y1="40" x2="440" y2="470" />
+          <line x1="250" y1="20" x2="250" y2="480" />
+          <line x1="40" y1="300" x2="470" y2="300" />
+        </g>
+        <path
+          d="M120 130 C 200 70, 330 90, 380 180 C 430 260, 400 360, 320 410 C 240 460, 130 430, 110 330 C 95 250, 80 180, 120 130 Z"
+          fill="#27548f"
+          opacity="0.55"
+        />
+        {
+          Object.entries(pins).map(([name, p]) => (
+            <g>
+              <circle cx={p.x} cy={p.y} r={p.primary ? 13 : 9} fill="#f6871f" stroke="#fff" stroke-width="3" />
+              <text
+                x={p.x + (p.primary ? 20 : 16)}
+                y={p.y + 5}
+                fill="#ffffff"
+                font-family="Barlow Condensed, sans-serif"
+                font-weight="700"
+                font-size={p.primary ? 30 : 24}
+                style="text-transform:uppercase;letter-spacing:0.04em"
+              >
+                {name}
+              </text>
+            </g>
+          ))
+        }
+      </svg>
+    </div>
+
+    <div>
+      <p class="kicker text-orange-700">Local and nearby</p>
+      <h2 class="mt-2 h-section">Proudly serving the Central Valley</h2>
+      <p class="mt-4 text-slate-600">
+        We are a local, licensed contractor based in {site.city}. We bring our {service} services to
+        homeowners across {site.city} and the surrounding Central Valley, with the same quality and
+        clear communication on every job.
+      </p>
+      <ul class="mt-6 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3">
+        {
+          site.serviceCities.map((c) => (
+            <li>
+              <a href={`/service-areas/${c.toLowerCase()}/`} class="font-display group flex items-center gap-1.5 text-sm font-semibold uppercase tracking-wide text-navy-700 hover:text-orange-600">
+                <Icon name="map" class="h-4 w-4 text-orange-500" />
+                {c}
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+      <div class="mt-8 flex flex-col gap-3 sm:flex-row">
+        <a href="/contact/" class="btn-primary">Get a Free Quote</a>
+        <a href={`tel:${site.phoneRaw}`} class="btn-outline">
+          <Icon name="phone" class="h-5 w-5" /> {site.phone}
+        </a>
+      </div>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,123 @@
+---
+import '../styles/global.css';
+import Logo from '../components/Logo.astro';
+import Icon from '../components/Icon.astro';
+import Motion from '../components/Motion.astro';
+import { site } from '../data/site';
+import { platforms } from '../data/landing';
+import type { AdPlatform } from '../data/landing';
+
+interface Props {
+  title: string;
+  description: string;
+  platform: AdPlatform;
+  /** Preload hint for the LCP hero image (same srcset/sizes as the img). */
+  preloadImage?: { href: string; imagesrcset?: string; imagesizes?: string };
+}
+const { title, description, platform, preloadImage } = Astro.props;
+const phone = platform.phone;
+
+// Conversion pixel snippets (injected only when an ID is configured)
+const pid = platform.pixelId;
+let pixel = '';
+if (pid && platform.key === 'google') {
+  pixel = `<script async src="https://www.googletagmanager.com/gtag/js?id=${pid}"></script><script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${pid}');</script>`;
+} else if (pid && platform.key === 'facebook') {
+  pixel = `<script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','${pid}');fbq('track','PageView');</script>`;
+} else if (pid && platform.key === 'microsoft') {
+  pixel = `<script>(function(w,d,t,r,u){var f,n,i;w[u]=w[u]||[],f=function(){var o={ti:'${pid}',enableAutoSpaTracking:true};o.q=w[u],w[u]=new UET(o),w[u].push('pageLoad')},n=d.createElement(t),n.src=r,n.async=1,n.onload=n.onreadystatechange=function(){var s=this.readyState;s&&s!=='loaded'&&s!=='complete'||(f(),n.onload=n.onreadystatechange=null)},i=d.getElementsByTagName(t)[0],i.parentNode.insertBefore(n,i)})(window,document,'script','//bat.bing.com/bat.js','uetq');</script>`;
+}
+
+// Google Ads base tag on non-Google landing pages (Facebook, Microsoft) for
+// remarketing audiences + tag coverage. Google LPs already load this id as their
+// conversion pixel above, so skip them to avoid a double config. Base tag only;
+// conversion events still fire on /thank-you/.
+const gAds = platforms.google.pixelId;
+const googleBase =
+  gAds && platform.key !== 'google'
+    ? `<script async src="https://www.googletagmanager.com/gtag/js?id=${gAds}"></script><script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}window.gtag=window.gtag||gtag;gtag('js',new Date());gtag('config','${gAds}');</script>`
+    : '';
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script is:inline>document.documentElement.classList.add('js')</script>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#255188" />
+    <!-- Self-hosted fonts (public/fonts + @font-face in global.css) -->
+    <link rel="preload" as="font" type="font/woff2" href="/fonts/barlow-latin-400-normal.woff2" crossorigin />
+    <link rel="preload" as="font" type="font/woff2" href="/fonts/barlow-condensed-latin-700-normal.woff2" crossorigin />
+    {preloadImage && (
+      <link rel="preload" as="image" href={preloadImage.href} imagesrcset={preloadImage.imagesrcset} imagesizes={preloadImage.imagesizes} fetchpriority="high" />
+    )}
+    {pixel && <Fragment set:html={pixel} />}
+    {googleBase && <Fragment set:html={googleBase} />}
+  </head>
+  <body class="flex min-h-screen flex-col bg-white text-slate-800">
+    <!-- Minimal header: logo + tracking phone + CTA. No nav (distraction-free). -->
+    <header class="border-b border-slate-200 bg-white">
+      <div class="container-x flex h-16 items-center justify-between gap-4 lg:h-20">
+        <Logo variant="color" class="h-9 w-auto lg:h-11" />
+        <div class="flex items-center gap-3">
+          <a href={`tel:${phone.raw}`} class="font-display hidden items-center gap-2 text-lg font-bold text-navy-700 sm:flex">
+            <Icon name="phone" class="h-5 w-5 text-orange-500" /> {phone.display}
+          </a>
+          <a href="#quote" class="btn-primary !px-4 !py-2 text-sm">Free Quote</a>
+        </div>
+      </div>
+    </header>
+
+    <main class="flex-1">
+      <slot />
+    </main>
+
+    <Motion />
+
+    <!-- Mobile: persistent bottom action bar (tracking number + in-funnel quote anchor) -->
+    <div class="fixed inset-x-0 bottom-0 z-40 grid grid-cols-2 border-t border-white/10 bg-navy-800/95 backdrop-blur lg:hidden">
+      <a href={`tel:${phone.raw}`} class="font-display flex items-center justify-center gap-2 py-3.5 text-sm font-bold uppercase tracking-wide text-white">
+        <Icon name="phone" class="h-5 w-5 text-orange-400" /> Call now
+      </a>
+      <a href="#quote" class="font-display flex items-center justify-center gap-2 bg-orange-500 py-3.5 text-sm font-bold uppercase tracking-wide text-navy-950">
+        <Icon name="check" class="h-5 w-5" /> Free Quote
+      </a>
+    </div>
+    <!-- spacer so the mobile bar never covers footer content -->
+    <div class="h-14 lg:hidden" aria-hidden="true"></div>
+
+    <!-- Minimal footer (no nav links) -->
+    <footer class="bg-navy-900 py-8 text-center text-sm text-navy-200">
+      <div class="container-x">
+        <p class="font-display text-base font-bold uppercase tracking-wide text-white">{site.name}</p>
+        <p class="mt-2">
+          <a href={`tel:${phone.raw}`} class="hover:text-white">{phone.display}</a>
+          <span class="px-2 text-navy-400">|</span>
+          Licensed CA #{site.license}
+          <span class="px-2 text-navy-400">|</span>
+          Serving {site.areaServed}
+        </p>
+        <p class="mt-3 text-xs text-navy-200">
+          © {new Date().getFullYear()} {site.name}. All rights reserved.
+          <a href="/privacy/" class="underline hover:text-white">Privacy Policy</a>
+          <span class="px-1 text-navy-400">|</span>
+          <a href="/terms/" class="underline hover:text-white">Terms of Service</a>
+        </p>
+      </div>
+    </footer>
+    <!-- First-party visit counter for the dashboard's landing-page stats.
+         Sends only the path; nothing about the visitor. -->
+    <script is:inline>
+      try {
+        if (!/bot|crawl|spider|headless|lighthouse/i.test(navigator.userAgent) && navigator.sendBeacon) {
+          navigator.sendBeacon('/api/hit/', new Blob([JSON.stringify({ p: location.pathname })], { type: 'text/plain' }));
+        }
+      } catch (e) {}
+    </script>
+  </body>
+</html>

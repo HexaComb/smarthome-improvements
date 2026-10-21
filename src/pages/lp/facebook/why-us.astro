@@ -1,0 +1,186 @@
+---
+// Facebook ads variant LP: the COMPANY angle. For brand/trust creatives
+// ("who we are, why homeowners pick us"). Service-agnostic: the form has a
+// service selector; leads route to the matching pipeline as usual.
+// noindex + out of the sitemap via the /lp/ exclusion.
+import LandingLayout from '../../../layouts/LandingLayout.astro';
+import StatsBand from '../../../components/StatsBand.astro';
+import Reviews from '../../../components/Reviews.astro';
+import Honeypot from '../../../components/Honeypot.astro';
+import FormConsent from '../../../components/FormConsent.astro';
+import Seal from '../../../components/Seal.astro';
+import Icon from '../../../components/Icon.astro';
+import { site } from '../../../data/site';
+import { platforms } from '../../../data/landing';
+import { cardSrcset } from '../../../lib/images';
+
+const platform = platforms.facebook;
+const phone = platform.phone;
+const formReady = site.formAccessKey.length > 0;
+
+const reasons = [
+  { icon: 'shield', title: 'Licensed & accountable', text: `California contractor #${site.license}. The work is done right and stands behind our name.` },
+  { icon: 'check', title: 'Honest, upfront pricing', text: 'A clear, itemized quote before any work starts. No surprises, no pressure, ever.' },
+  { icon: 'clock', title: 'On time, every time', text: 'Clear timelines, crews that show up when promised, and jobs finished on schedule.' },
+  { icon: 'roof', title: 'Clean job sites', text: 'We protect your home, clean up fully every day, and finish with a magnetic nail sweep.' },
+];
+
+const promises = [
+  'A real person answers when you call',
+  'Free, thorough inspections with photos',
+  'We tell you when a repair beats a replacement',
+  'Our get-it-right guarantee on every job',
+];
+---
+
+<LandingLayout
+  title={`Why Central Valley Homeowners Choose Us | ${site.name}`}
+  description="Licensed, local, and rated 4.9 stars. Meet the Smart Home Improvements team and see why Fresno homeowners trust us with their roofs, windows, and insulation."
+  platform={platform}
+>
+  <!-- HERO: company-first -->
+  <section class="relative overflow-hidden bg-navy-900 bg-blueprint grain text-white">
+    <div class="container-x relative grid items-start gap-10 py-12 lg:grid-cols-12 lg:py-16">
+      <div class="lg:col-span-7">
+        <div class="flex flex-wrap items-center gap-3">
+          <span class="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-sm font-semibold text-white ring-1 ring-white/20">
+            <span class="flex text-orange-400" aria-hidden="true">
+              {Array.from({ length: 5 }).map(() => <Icon name="star" class="h-4 w-4" />)}
+            </span>
+            {site.rating.value} from {site.rating.count} reviews
+          </span>
+          <span class="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-sm font-semibold text-white ring-1 ring-white/20">
+            <Icon name="shield" class="h-4 w-4 text-orange-400" /> Licensed CA #{site.license}
+          </span>
+        </div>
+        <p class="kicker mt-5 text-orange-400">A local company you can actually reach</p>
+        <h1 class="font-display mt-2 text-4xl font-bold uppercase leading-[0.95] tracking-tight sm:text-5xl">
+          The straight-answer home improvement company in <span class="text-orange-400">Fresno</span>
+        </h1>
+        <div class="rule-dim mt-4 w-24 text-orange-500" aria-hidden="true"></div>
+        <p class="mt-5 max-w-xl text-lg text-navy-100">
+          Roofing, windows, and insulation for the Central Valley, done by a licensed local crew
+          that answers the phone, shows up on time, and treats your home like our own.
+        </p>
+        <ul class="mt-6 grid max-w-xl gap-2 sm:grid-cols-2">
+          {promises.map((b) => (
+            <li class="flex items-start gap-2 font-display font-semibold uppercase tracking-wide text-white">
+              <Icon name="check" class="mt-0.5 h-5 w-5 flex-shrink-0 text-orange-400" /> {b}
+            </li>
+          ))}
+        </ul>
+        <div class="mt-7 flex flex-col gap-3 sm:flex-row">
+          <a href="#quote" class="btn-primary">Get My Free Estimate</a>
+          <a href={`tel:${phone.raw}`} class="btn-secondary">
+            <Icon name="phone" class="h-5 w-5" /> {phone.display}
+          </a>
+        </div>
+      </div>
+
+      <!-- Form: service selector so any creative can land here -->
+      <div id="quote" class="scroll-mt-20 lg:col-span-5">
+        <div class="overflow-hidden rounded-2xl bg-white text-slate-800 shadow-2xl ring-1 ring-black/5">
+          <div class="h-1.5 w-full bg-gradient-to-r from-orange-500 to-orange-400"></div>
+          <div class="p-6 sm:p-7">
+            <h2 class="font-display text-2xl font-bold uppercase tracking-tight text-navy-700">Get your free estimate</h2>
+            <p class="mt-1 text-sm text-slate-500">Free inspection included. No cost, no obligation.</p>
+            {!formReady && (
+              <p class="mt-4 rounded-lg bg-orange-50 p-3 text-xs text-orange-700 ring-1 ring-orange-200">Form is being configured. Call us at {phone.display}.</p>
+            )}
+            <form method="POST" action="/api/lead/" class="mt-4 grid gap-3">
+              <input type="hidden" name="lead_source" value="Facebook Ads - Why Us" />
+              <Honeypot />
+              <div class="grid gap-3 sm:grid-cols-2">
+                <input name="name" required aria-label="Full name" autocomplete="name" placeholder="Full name" class="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-200" />
+                <input name="phone" type="tel" required aria-label="Phone number" autocomplete="tel" inputmode="tel" pattern="[0-9()+\-. ]{10,}" title="Enter a 10 digit phone number" placeholder="Phone" class="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-200" />
+                <input name="email" type="email" aria-label="Email" autocomplete="email" placeholder="Email" class="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-200" />
+                <input name="zip" aria-label="ZIP code" autocomplete="postal-code" inputmode="numeric" pattern="[0-9]{5}(-[0-9]{4})?" title="Enter a 5 digit ZIP code" placeholder="ZIP code" class="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-200" />
+              </div>
+              <div class="grid gap-3 sm:grid-cols-2">
+                <input name="address" aria-label="Street address" autocomplete="street-address" placeholder="Street address" class="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-200" />
+                <input name="city" aria-label="City" autocomplete="address-level2" placeholder="City" class="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-200" />
+              </div>
+              <select name="service" required aria-label="Service needed" class="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-slate-800 invalid:text-slate-500 focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-200">
+                <option value="" disabled selected>What do you need?</option>
+                <option value="Roofing">Roofing</option>
+                <option value="Windows">Windows</option>
+                <option value="Insulation">Insulation</option>
+                <option value="Multiple / Other">Multiple / Other</option>
+              </select>
+              <textarea name="message" rows="2" aria-label="Tell us about your project or question" placeholder="Tell us about your project or question (optional)" class="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-200"></textarea>
+              <button type="submit" disabled={!formReady} class="btn-primary w-full disabled:cursor-not-allowed disabled:opacity-50">
+                Request My Free Estimate
+              </button>
+              <p class="text-center text-xs text-slate-500">Free and no obligation. We respond fast.</p>
+              <FormConsent />
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <StatsBand />
+
+  <!-- Why us plates -->
+  <section class="section bg-white">
+    <div class="container-x">
+      <p class="kicker text-orange-700">Why homeowners pick us</p>
+      <h2 class="h-section mt-2">What working with us is actually like</h2>
+      <div class="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        {reasons.map((r) => (
+          <div class="border border-navy-600/20 bg-white p-6">
+            <span class="grid h-11 w-11 place-items-center bg-navy-50 text-navy-700">
+              <Icon name={r.icon} class="h-5 w-5" />
+            </span>
+            <h3 class="font-display mt-4 text-xl font-bold uppercase tracking-tight text-navy-800">{r.title}</h3>
+            <p class="mt-2 text-sm text-slate-600">{r.text}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Crew / story -->
+  <section class="section bg-navy-50 bg-blueprint-light">
+    <div class="container-x grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
+      <div>
+        <img src="/photos/feature/crew.jpg" srcset={cardSrcset('/photos/feature/crew.jpg')} sizes="(min-width: 1024px) 45vw, 92vw" alt="Smart Home Improvements crew member working on a Central Valley home" width="1400" height="1050" loading="lazy" decoding="async" class="aspect-[4/3] w-full object-cover" />
+        <p class="spec-tag">Our crew <span class="text-navy-200">·</span> Fresno, CA</p>
+      </div>
+      <div>
+        <p class="kicker text-orange-700">Local, not a lead reseller</p>
+        <h2 class="h-section mt-2">When you call us, you get us</h2>
+        <div class="rule-dim mt-4 w-20 text-orange-500" aria-hidden="true"></div>
+        <p class="mt-5 max-w-prose text-lg text-slate-700">
+          Plenty of companies advertise here and sell your information to whoever pays the most.
+          We are the opposite: a licensed Central Valley contractor with our own crews, doing
+          roofing, windows, and insulation for our neighbors for over {site.yearsInBusiness} years.
+        </p>
+        <blockquote class="mt-6 border-l-2 border-orange-500 pl-5">
+          <p class="h-sub text-2xl leading-snug text-navy-800">
+            Honest work, done right the first time. That is the promise behind every job we take on.
+          </p>
+          <footer class="mt-2 text-sm font-semibold text-slate-500">The Smart Home team</footer>
+        </blockquote>
+        <a href="#quote" class="btn-primary mt-7">Get My Free Estimate</a>
+      </div>
+    </div>
+  </section>
+
+  <Reviews />
+
+  <!-- Guarantee band -->
+  <section class="relative overflow-hidden bg-navy-950 bg-blueprint grain py-14 text-white">
+    <div class="container-x flex flex-col items-center gap-8 text-center lg:flex-row lg:text-left">
+      <Seal variant="navy" class="h-32 w-32 flex-shrink-0 text-orange-400" />
+      <div class="grow">
+        <p class="kicker text-navy-200">Our get-it-right guarantee</p>
+        <p class="h-sub mx-auto mt-2 max-w-2xl text-2xl leading-snug lg:mx-0">
+          If something is not right, we make it right. That is what the license on every truck means.
+        </p>
+      </div>
+      <a href="#quote" class="btn-primary flex-shrink-0">Get My Free Estimate</a>
+    </div>
+  </section>
+</LandingLayout>

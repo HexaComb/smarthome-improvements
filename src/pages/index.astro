@@ -1,0 +1,368 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { cardSrcset } from '../lib/images';
+import Icon from '../components/Icon.astro';
+import SectionHead from '../components/SectionHead.astro';
+import Honeypot from '../components/Honeypot.astro';
+import FormConsent from '../components/FormConsent.astro';
+import Reviews from '../components/Reviews.astro';
+import CtaBand from '../components/CtaBand.astro';
+import FeatureRow from '../components/FeatureRow.astro';
+import Guarantee from '../components/Guarantee.astro';
+import ProcessSteps from '../components/ProcessSteps.astro';
+import AreaLinks from '../components/AreaLinks.astro';
+import StatsBand from '../components/StatsBand.astro';
+import BeforeAfter from '../components/BeforeAfter.astro';
+import VideoGallery from '../components/VideoGallery.astro';
+import ProjectStrip from '../components/ProjectStrip.astro';
+import { videos } from '../data/videos';
+import { site } from '../data/site';
+import { services, serviceContent } from '../data/serviceContent';
+import { projects } from '../data/projects';
+import PromiseBand from '../components/PromiseBand.astro';
+import { getCollection } from 'astro:content';
+
+const formReady = site.formAccessKey.length > 0;
+
+const featured = [
+  projects.find((p) => p.slug === 'roof-fresno-tyler'),
+  projects.find((p) => p.slug === 'windows-visalia-monte-vista'),
+  projects.find((p) => p.slug === 'roof-hanford-lassen'),
+].filter(Boolean) as typeof projects;
+
+const faqs = [
+  serviceContent.roofing.faqs[0],
+  serviceContent.roofing.faqs[3],
+  serviceContent.windows.faqs[0],
+  serviceContent.insulation.faqs[0],
+  { q: 'What areas do you serve?', a: `We serve ${site.serviceCities.join(', ')}, and the surrounding Central Valley.` },
+];
+
+const posts = (await getCollection('blog'))
+  .sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf())
+  .slice(0, 3);
+const fmt = (d: Date) =>
+  d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+const schema = [{ '@context': 'https://schema.org', '@type': 'WebSite', name: site.name, url: site.url }];
+---
+
+<Layout
+  title="Roofing, Windows & Insulation in Fresno, CA"
+  description="Smart Home Improvements provides expert roofing, window, and insulation services in Fresno & the Central Valley. Licensed (CA #1129883), 10+ years, free estimates. Call (559) 833-6945."
+  path="/"
+  schema={schema}
+  ctaHref="#quote"
+  preloadImage={{
+    href: '/photos/hero/home-hero-800.webp',
+    imagesrcset: '/photos/hero/home-hero-800.webp 800w, /photos/hero/home-hero-1280.webp 1280w, /photos/hero/home-hero-2000.webp 2000w',
+    imagesizes: '100vw',
+  }}
+>
+  <!-- HERO -->
+  <section class="relative overflow-hidden bg-navy-950 text-white">
+    <div class="duo absolute inset-0">
+      <img src="/photos/hero/home-hero.jpg" srcset="/photos/hero/home-hero-800.webp 800w, /photos/hero/home-hero-1280.webp 1280w, /photos/hero/home-hero-2000.webp 2000w" sizes="100vw" alt="Completed roof on a Central Valley home by Smart Home Improvements" width="2000" height="1333" fetchpriority="high" decoding="async" class="h-full w-full object-cover" />
+    </div>
+    <div class="absolute inset-0 bg-gradient-to-r from-navy-950 via-navy-950/85 to-navy-950/30"></div>
+    <div class="absolute inset-y-0 right-0 hidden w-1/2 bg-blueprint lg:block" aria-hidden="true"></div>
+
+    <div class="container-x relative grid items-center gap-10 py-14 lg:grid-cols-12 lg:gap-8 lg:py-20">
+      <div class="lg:col-span-7">
+        <div class="flex items-center gap-3">
+          <span class="sheet-no sheet-no-dark" aria-hidden="true">01</span>
+          <p class="kicker num text-white">Fresno, CA <span class="text-navy-200">·</span> CA Lic #{site.license} <span class="text-navy-200">·</span> {site.yearsInBusiness}+ yrs</p>
+          <span class="h-px flex-1 bg-white/20" aria-hidden="true"></span>
+        </div>
+        <h1 class="h-hero mt-5">
+          Roofing, windows &amp; insulation in <span class="text-orange-400">{site.city}</span> &amp; the Central Valley
+        </h1>
+        <div class="rule-dim mt-5 w-24 text-orange-500" aria-hidden="true"></div>
+
+        <!-- Stamped approval strip: proof + credentials -->
+        <div class="mt-7 inline-flex flex-wrap divide-x divide-white/20 border border-white/20">
+          <a href={site.rating.url} target="_blank" rel="noopener" class="num flex items-center gap-3 px-5 py-3 font-display text-sm font-semibold uppercase text-white hover:bg-white/5">
+            <span class="flex text-orange-400" aria-hidden="true">{Array.from({ length: 5 }).map(() => <Icon name="star" class="h-4 w-4" />)}</span>
+            <span>{site.rating.value} <span class="text-navy-200">·</span> {site.rating.count} Google reviews</span>
+          </a>
+          <span class="num flex items-center px-5 py-3 font-display text-sm font-semibold uppercase text-white">Licensed CA #{site.license}</span>
+          <span class="num flex items-center px-5 py-3 font-display text-sm font-semibold uppercase text-white">{site.yearsInBusiness}+ years local</span>
+        </div>
+
+        <div class="mt-8 flex flex-col gap-3 sm:flex-row">
+          <a href="#quote" class="btn-primary">Get a Free Quote <Icon name="arrow" class="h-5 w-5" /></a>
+          <a href={`tel:${site.phoneRaw}`} class="btn-secondary">
+            <Icon name="phone" class="h-5 w-5" /> {site.phone}
+          </a>
+        </div>
+        <a href="/estimate/" class="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-navy-100 underline decoration-orange-400/60 underline-offset-4 hover:text-white">
+          See a ballpark price now, no contact info needed <Icon name="arrow" class="h-4 w-4" />
+        </a>
+      </div>
+
+      <!-- Hero lead form: the one above-the-fold form on every screen size.
+           The full form (address/city/message) lives mid-page at #quote. -->
+      <div class="lg:col-span-5">
+        <div class="crops crops-on border border-white/20 bg-white p-6 text-slate-800">
+          {formReady ? (
+            <form method="POST" action="/api/lead/" class="grid gap-3">
+              <input type="hidden" name="lead_source" value="Website - Homepage" />
+              <Honeypot />
+              <p class="spec-tag-ghost kicker text-navy-500">Free estimate <span class="text-navy-300">·</span> No obligation</p>
+              <h2 class="font-display text-2xl font-bold uppercase tracking-tight text-navy-800">Get your free quote</h2>
+              <input name="name" required aria-label="Full name" autocomplete="name" placeholder="Full name" class="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-200" />
+              <div class="grid gap-3 sm:grid-cols-2">
+                <input name="phone" type="tel" required aria-label="Phone number" autocomplete="tel" inputmode="tel" pattern="[0-9()+\-. ]{10,}" title="Enter a 10 digit phone number" placeholder="Phone number" class="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-200" />
+                <input name="zip" aria-label="ZIP code" autocomplete="postal-code" inputmode="numeric" pattern="[0-9]{5}(-[0-9]{4})?" title="Enter a 5 digit ZIP code" placeholder="ZIP code" class="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-200" />
+              </div>
+              <select name="service" required aria-label="Service needed" class="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-slate-800 invalid:text-slate-500 focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-200">
+                <option value="" disabled selected>What do you need?</option>
+                {services.map((s) => <option value={s.name}>{s.name}</option>)}
+                <option value="Multiple / Other">Multiple / Other</option>
+              </select>
+              <button type="submit" class="btn-primary w-full">Request My Free Quote</button>
+              <p class="text-center text-xs text-slate-500">A real person responds fast. More to add? <a href="#quote" class="underline">Use the full form below</a>.</p>
+              <FormConsent />
+            </form>
+          ) : (
+            <div>
+              <h2 class="font-display text-xl font-bold uppercase tracking-tight text-navy-700">Request your free quote</h2>
+              <p class="mt-2 text-sm text-slate-600">Fast, free, and no obligation. Call now and a real person answers.</p>
+              <a href={`tel:${site.phoneRaw}`} class="btn-primary mt-4 w-full">
+                <Icon name="phone" class="h-5 w-5" /> {site.phone}
+              </a>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+
+    <div class="rule-dim text-navy-200/40" aria-hidden="true"></div>
+  </section>
+
+  <StatsBand />
+
+  <!-- SERVICES (revenue-priority plan sheets) -->
+  <section class="section">
+    <div class="container-x">
+      <SectionHead no="02" kicker="What we do" title="Premier home improvement services">
+        <p class="mt-4 max-w-prose text-slate-600">
+          Specializing in roofing, windows, and insulation for homes across {site.areaServed}.
+        </p>
+      </SectionHead>
+      <div class="mt-12 grid gap-6 lg:grid-cols-12" data-stagger>
+        {
+          services.map((s) => (
+            <article class:list={['group relative crops flex flex-col border border-navy-600/20 bg-white hover:border-navy-600/50', s.slug === 'roofing' ? 'lg:col-span-7 lg:row-span-2' : 'lg:col-span-5']}>
+              <span class:list={['absolute inset-x-0 top-0 h-0.5 origin-left bg-orange-500 transition-transform duration-200', s.slug === 'roofing' ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100']} aria-hidden="true"></span>
+              {/* Insulation has no real photo yet; per the evidence doctrine the
+                  system diagram is framed honestly as a FIG plate, not faked as a photo. */}
+              {s.slug === 'insulation' ? (
+                <a href={`/${s.slug}/`} class="relative block overflow-hidden bg-navy-900 bg-blueprint p-6">
+                  <img src="/illustrations/insulation-cutaway.svg" alt="Isometric cutaway of an insulated attic system" width="1400" height="1050" loading="lazy" decoding="async" class="mx-auto aspect-[4/3] w-full max-w-sm object-contain" />
+                </a>
+              ) : (
+                <a href={`/${s.slug}/`} class:list={['relative block overflow-hidden', s.slug === 'roofing' ? 'aspect-[16/10] lg:aspect-auto lg:min-h-64 lg:flex-1' : 'aspect-[4/3]']}>
+                  <img src={s.cardImage ?? s.image} srcset={cardSrcset(s.cardImage ?? s.image)} sizes="(min-width: 1024px) 55vw, 92vw" alt={s.cardImageAlt ?? s.imageAlt} width="1400" height="1050" loading="lazy" decoding="async" class="absolute inset-0 h-full w-full object-cover" />
+                </a>
+              )}
+              <p class="spec-tag">{s.slug === 'roofing' ? 'Most requested · Roofing · Central Valley' : s.slug === 'insulation' ? 'Fig. 1 · Attic insulation system' : `${s.name} · Central Valley`}</p>
+              <div class:list={['flex flex-col bg-white p-5', s.slug !== 'roofing' && 'flex-1']}>
+                <h3 class="font-display text-2xl font-bold uppercase tracking-tight text-navy-800">{s.name}</h3>
+                <p class="mt-1 text-sm text-slate-600">{s.summary}</p>
+                <ul class="mt-4 grid gap-2">
+                  {s.children.map((c) => (
+                    <li>
+                      <a href={`/${s.slug}/${c.slug}/`} class="group/sub flex items-center gap-2 text-sm font-medium text-navy-700 hover:text-orange-600">
+                        <Icon name="check" class="h-4 w-4 flex-shrink-0 text-orange-500" />
+                        <span class="flex-1">{c.name}</span>
+                        <Icon name="arrow" class="h-4 w-4 text-navy-300 transition group-hover/sub:translate-x-1 group-hover/sub:text-orange-500" />
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+                <a href={`/${s.slug}/`} class="mt-4 inline-flex items-center gap-1 font-semibold text-navy-700 hover:text-orange-600">
+                  All {s.name.toLowerCase()} services <Icon name="arrow" class="h-4 w-4" />
+                </a>
+              </div>
+            </article>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <Reviews />
+
+  <!-- FEATURE: why us (image left) -->
+  <FeatureRow
+    eyebrow="Why Smart Home Improvements"
+    title="Real people who treat your home like our own"
+    image="/photos/feature/crew.jpg"
+    imageAlt="Smart Home Improvements crew member in a branded shirt installing a window in Fresno, CA"
+    tone="muted"
+    bullets={[
+      'Over 10 years of local experience',
+      'Licensed California contractor',
+      'Honest, upfront pricing',
+      'Materials picked for Central Valley heat',
+    ]}
+    cta={{ href: '/about/', label: 'About Us' }}
+  >
+    <p class="text-xl font-medium text-slate-700">
+      We answer the phone, show up on time, and treat your home like our own. Brutal summers, cold
+      winters: everything we install is chosen to handle Valley weather and lower your energy bills.
+    </p>
+  </FeatureRow>
+
+  <Guarantee />
+
+  <ProcessSteps />
+
+  <!-- LEAD FORM BAND (full form: address, city, message). Mid-page so it's not back to back with the hero form; all quote CTAs anchor here. -->
+  <section id="quote" class="scroll-mt-20 bg-navy-900 bg-blueprint grain text-white">
+    <div class="container-x grid gap-8 py-12 lg:grid-cols-12 lg:items-center lg:gap-12 lg:py-16">
+      <div class="lg:col-span-5">
+        <p class="kicker text-orange-400">Free, no obligation</p>
+        <h2 class="mt-2 font-display text-3xl font-bold uppercase leading-[0.98] tracking-tight sm:text-4xl">Get your free estimate</h2>
+        <div class="mt-5 flex items-center gap-2">
+          <span class="flex">{Array.from({ length: 5 }).map(() => <Icon name="star" class="h-5 w-5 text-orange-400" />)}</span>
+          <span class="font-semibold">{site.rating.value} from {site.rating.count} Google reviews</span>
+        </div>
+        <ul class="mt-6 space-y-2.5">
+          {['Roofing, windows & insulation', 'Honest, upfront pricing', 'Real people who answer the phone'].map((b) => (
+            <li class="flex items-center gap-2.5 text-navy-100">
+              <Icon name="check" class="h-5 w-5 flex-shrink-0 text-orange-400" /> {b}
+            </li>
+          ))}
+        </ul>
+        <a href={`tel:${site.phoneRaw}`} class="num mt-7 inline-flex items-center gap-2 font-display text-2xl font-bold text-white hover:text-orange-300">
+          <Icon name="phone" class="h-6 w-6 text-orange-400" /> {site.phone}
+        </a>
+      </div>
+
+      <div class="order-first lg:order-none lg:col-span-7">
+        <div class="rounded-2xl bg-white p-6 text-slate-800 shadow-2xl ring-1 ring-black/5 sm:p-7">
+          {formReady ? (
+            <form method="POST" action="/api/lead/" class="grid gap-3">
+              <input type="hidden" name="lead_source" value="Website - Homepage" />
+              <Honeypot />
+              <div class="grid gap-3 sm:grid-cols-2">
+                <input name="name" required aria-label="Full name" autocomplete="name" placeholder="Full name" class="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-200" />
+                <input name="phone" type="tel" required aria-label="Phone number" autocomplete="tel" inputmode="tel" pattern="[0-9()+\-. ]{10,}" title="Enter a 10 digit phone number" placeholder="Phone number" class="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-200" />
+                <input name="email" type="email" aria-label="Email" autocomplete="email" placeholder="Email" class="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-200" />
+                <input name="zip" aria-label="ZIP code" autocomplete="postal-code" inputmode="numeric" pattern="[0-9]{5}(-[0-9]{4})?" title="Enter a 5 digit ZIP code" placeholder="ZIP code" class="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-200" />
+              </div>
+              <div class="grid gap-3 sm:grid-cols-2">
+                <input name="address" aria-label="Street address" autocomplete="street-address" placeholder="Street address" class="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-200" />
+                <input name="city" aria-label="City" autocomplete="address-level2" placeholder="City" class="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-200" />
+              </div>
+              <select name="service" required aria-label="Service needed" class="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-slate-800 invalid:text-slate-500 focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-200">
+                <option value="" disabled selected>What do you need?</option>
+                {services.map((s) => <option value={s.name}>{s.name}</option>)}
+                <option value="Multiple / Other">Multiple / Other</option>
+              </select>
+              <textarea name="message" rows="2" aria-label="Tell us about your project or question" placeholder="Tell us about your project or question (optional)" class="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-200"></textarea>
+              <button type="submit" class="btn-primary w-full">Request My Free Quote</button>
+              <p class="text-center text-xs text-slate-500">Free and no obligation. We respond fast.</p>
+              <FormConsent />
+            </form>
+          ) : (
+            <div>
+              <h3 class="font-display text-xl font-bold uppercase tracking-tight text-navy-700">Request your free quote</h3>
+              <p class="mt-2 text-sm text-slate-600">Fast, free, and no obligation. Call now or request a quote online and we will get right back to you.</p>
+              <div class="mt-4 grid gap-3">
+                <a href={`tel:${site.phoneRaw}`} class="btn-primary w-full">
+                  <Icon name="phone" class="h-5 w-5" /> {site.phone}
+                </a>
+                <a href="/contact/" class="btn-outline w-full">Request a Free Quote</a>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <ProjectStrip items={featured} />
+
+  <BeforeAfter
+    before="/photos/before-after/windows-before.jpg"
+    after="/photos/before-after/windows-after.jpg"
+    beforeAlt="Old louvered aluminum windows on a Fresno, CA home before replacement"
+    afterAlt="New white vinyl replacement windows on a Fresno, CA home after installation"
+    heading="See the transformation"
+    sub="Old, drafty windows replaced with clean, energy-efficient vinyl. Drag to compare."
+  />
+
+  <VideoGallery
+    items={videos}
+    eyebrow="Hear from our customers"
+    heading="Real homeowners, real results"
+    sub={`Real jobs and real customers, on video. Neighbors rate us ${site.rating.value} stars across ${site.rating.count} Google reviews.`}
+  />
+
+  <PromiseBand tone="dark" />
+
+  <!-- FAQ -->
+  <section class="section bg-navy-50 bg-blueprint-light">
+    <div class="container-x max-w-3xl">
+      <SectionHead kicker="Good to know" title="Frequently asked questions" />
+      <p class="mt-3 text-sm text-slate-600">
+        Want a price first? <a href="/estimate/" class="font-semibold text-navy-700 underline">Get an instant estimate in 60 seconds</a>, or read <a href="/faq/" class="font-semibold text-navy-700 underline">every question we get asked</a>.
+      </p>
+      <div class="mt-10 divide-y divide-navy-600/15 rounded-none border border-navy-600/25 bg-white">
+        {
+          faqs.map((f, i) => (
+            <details class="group p-5">
+              <summary class="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold text-navy-900">
+                <span class="kicker num mr-3 text-navy-500">Q.0{i + 1}</span>
+                <span class="flex-1">{f.q}</span>
+                <Icon name="arrow" class="h-5 w-5 flex-shrink-0 text-navy-500 transition group-open:rotate-90" />
+              </summary>
+              <p class="mt-3 text-slate-600">{f.a}</p>
+            </details>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <!-- RECENT BLOG -->
+  <section class="section">
+    <div class="container-x">
+      <div class="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p class="kicker text-orange-700">From the blog</p>
+          <h2 class="mt-2 h-section">Tips for a better home</h2>
+        </div>
+        <a href="/blog/" class="hidden btn-outline sm:inline-flex">View all posts</a>
+      </div>
+      <div class="mt-10 divide-y divide-navy-600/15">
+        {
+          posts.map((post) => (
+            <article class="grid items-baseline gap-4 py-6 hover:bg-navy-50 lg:grid-cols-12">
+              <time datetime={post.data.date.toISOString()} class="num text-sm text-slate-500 lg:col-span-2">{fmt(post.data.date)}</time>
+              <h3 class="font-display text-2xl font-bold uppercase tracking-tight text-navy-800 lg:col-span-7">
+                <a href={`/blog/${post.id}/`} class="hover:text-orange-600">{post.data.title}</a>
+              </h3>
+              <p class="flex items-center gap-2 lg:col-span-3 lg:justify-end">
+                <span class="kicker text-navy-500">{post.data.category}</span>
+                <Icon name="arrow" class="h-4 w-4 flex-shrink-0 text-navy-400" />
+              </p>
+            </article>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <AreaLinks heading="Local home improvement help across the Central Valley" />
+
+  <CtaBand
+    heading="The best for your home"
+    sub="Get a free, no-obligation estimate from a licensed local team that does it right the first time."
+    image="/photos/hero/projects.jpg"
+    href="#quote"
+  />
+</Layout>

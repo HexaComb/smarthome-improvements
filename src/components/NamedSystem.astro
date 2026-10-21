@@ -1,0 +1,52 @@
+---
+// "The Smart Home Standard": the things we already do on every job, named so
+// homeowners can ask for them by name. Every claim here is one the site
+// already makes elsewhere (protection, daily cleanup, magnet sweep, photo
+// documentation, itemized quote, guarantee). Do not add promises here that
+// the crew does not deliver.
+import SectionHead from './SectionHead.astro';
+import Icon from './Icon.astro';
+import Seal from './Seal.astro';
+
+const parts = [
+  { icon: 'shield', name: 'Home Shield', text: 'Before the first tool comes out, we cover and protect your landscaping, driveway, and interior spaces from debris and dust.' },
+  { icon: 'check', name: 'Magnet-Swept Cleanup', text: 'The site is cleaned every day we are there, and the job ends with a magnetic sweep of your yard and driveway so no nail is left behind.' },
+  { icon: 'roof', name: 'Photo-Documented Work', text: 'Your inspection and your finished job are documented with photos, so you see what we saw and what we did, not just a bill.' },
+];
+---
+
+<section class="relative overflow-hidden bg-navy-950 bg-blueprint grain py-16 text-white sm:py-20">
+  <div class="container-x">
+    <div class="grid items-center gap-10 lg:grid-cols-12">
+      <div class="lg:col-span-4">
+        <p class="kicker text-orange-400">The Smart Home Standard</p>
+        <h2 class="font-display mt-2 text-3xl font-bold uppercase leading-tight tracking-tight sm:text-4xl">
+          What every job gets, by name
+        </h2>
+        <div class="rule-dim mt-4 w-24 text-orange-500" aria-hidden="true"></div>
+        <p class="mt-5 max-w-prose text-navy-100">
+          Most of what separates a good contractor from a bad one happens around the work, not in it.
+          These three are standard on every roof, window, and insulation job we do. Ask for them by name.
+        </p>
+        <div class="mt-6 flex items-center gap-4">
+          <Seal variant="navy" class="h-20 w-20 flex-shrink-0 text-orange-400" />
+          <p class="text-sm text-navy-200">
+            Backed by our <span class="font-semibold text-white">Get-It-Right Guarantee</span>: if something is not right, we make it right.
+          </p>
+        </div>
+      </div>
+      <div class="grid gap-5 lg:col-span-8 lg:grid-cols-3" data-stagger>
+        {parts.map((p, i) => (
+          <div class="border border-white/15 bg-white/5 p-6">
+            <span class="grid h-11 w-11 place-items-center bg-orange-500 text-navy-950">
+              <Icon name={p.icon} class="h-5 w-5" />
+            </span>
+            <p class="kicker num mt-4 text-navy-300">Standard 0{i + 1}</p>
+            <h3 class="font-display mt-1 text-xl font-bold uppercase tracking-tight text-white">{p.name}</h3>
+            <p class="mt-2 text-sm text-navy-100">{p.text}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+</section>

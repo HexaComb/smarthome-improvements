@@ -1,0 +1,186 @@
+---
+// Facebook ads variant LP: the PRODUCT angle for windows. For creatives that
+// sell the windows themselves (Anlin, dual-pane, energy savings). Leads tag
+// as Facebook Ads - Windows and route to the Window Pipeline.
+// noindex + out of the sitemap via the /lp/ exclusion.
+import LandingLayout from '../../../layouts/LandingLayout.astro';
+import LandingForm from '../../../components/LandingForm.astro';
+import StatsBand from '../../../components/StatsBand.astro';
+import Reviews from '../../../components/Reviews.astro';
+import BeforeAfter from '../../../components/BeforeAfter.astro';
+import PhotoGallery from '../../../components/PhotoGallery.astro';
+import Icon from '../../../components/Icon.astro';
+import { site } from '../../../data/site';
+import { platforms, offerFor } from '../../../data/landing';
+import { localVsl } from '../../../data/videos';
+import { galleryByService } from '../../../data/gallery';
+
+const platform = platforms.facebook;
+const phone = platform.phone;
+const offer = offerFor.windows;
+const vsl = localVsl.windows;
+const photos = (galleryByService.windows ?? []).slice(0, 8);
+
+const products = [
+  { icon: 'window', title: 'Dual-pane vinyl windows', text: 'Two panes of glass with an insulating layer between them. The single biggest upgrade for comfort and cooling bills in Valley heat.', illustration: '/illustrations/window-cutaway.svg' },
+  { icon: 'leaf', title: 'Low-E glass', text: 'An invisible coating that reflects heat back outside in summer and keeps warmth in through winter.', illustration: '/illustrations/insp-win-seal.svg' },
+  { icon: 'wrench', title: 'Sliders, hung & bay styles', text: 'Horizontal sliders, single and double hung, and bay windows, sized and fitted to your openings.', illustration: '/illustrations/mat-win-slider.svg' },
+  { icon: 'shield', title: 'Professional installation', text: 'Precise measurement, clean removal, insulated and sealed installs. The window is half the job; the install is the other half.', illustration: '/illustrations/mat-win-hung.svg' },
+];
+
+const outcomes = [
+  'Cooler rooms without running the AC all day',
+  'Noticeably quieter house near busy streets',
+  'No more drafts, sticking frames, or fogged glass',
+  'Better security and resale value',
+];
+---
+
+<LandingLayout
+  title={`Energy-Efficient Replacement Windows in Fresno | ${site.name}`}
+  description="Anlin dual-pane replacement windows installed by a licensed Fresno contractor. Cut cooling bills, block noise, and upgrade your home. Free in-home assessment."
+  platform={platform}
+>
+  <!-- HERO: product-first -->
+  <section class="relative overflow-hidden bg-navy-900 bg-blueprint grain text-white">
+    <div class="container-x relative grid items-start gap-10 py-12 lg:grid-cols-12 lg:py-16">
+      <div class="lg:col-span-7">
+        <div class="flex flex-wrap items-center gap-3">
+          <span class="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-sm font-semibold text-white ring-1 ring-white/20">
+            <span class="flex text-orange-400" aria-hidden="true">
+              {Array.from({ length: 5 }).map(() => <Icon name="star" class="h-4 w-4" />)}
+            </span>
+            {site.rating.value} from {site.rating.count} reviews
+          </span>
+          <span class="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-sm font-semibold text-white ring-1 ring-white/20">
+            <Icon name="shield" class="h-4 w-4 text-orange-400" /> Licensed CA #{site.license}
+          </span>
+        </div>
+        <p class="kicker mt-5 text-orange-400">Premium windows, installed right</p>
+        <h1 class="font-display mt-2 text-4xl font-bold uppercase leading-[0.95] tracking-tight sm:text-5xl">
+          The windows that beat <span class="text-orange-400">Valley heat</span>
+        </h1>
+        <div class="rule-dim mt-4 w-24 text-orange-500" aria-hidden="true"></div>
+        <p class="mt-5 max-w-xl text-lg text-navy-100">
+          Anlin dual-pane, Low-E replacement windows fitted by a licensed local crew. Cut
+          cooling bills, block street noise, and retire those drafty single panes for good.
+        </p>
+        <ul class="mt-6 grid max-w-xl gap-2">
+          {outcomes.map((b) => (
+            <li class="flex items-start gap-2 font-display font-semibold uppercase tracking-wide text-white">
+              <Icon name="check" class="mt-0.5 h-5 w-5 flex-shrink-0 text-orange-400" /> {b}
+            </li>
+          ))}
+        </ul>
+        <div class="mt-7 flex flex-col gap-3 sm:flex-row">
+          <a href="#quote" class="btn-primary">Get My Free Window Quote</a>
+          <a href={`tel:${phone.raw}`} class="btn-secondary">
+            <Icon name="phone" class="h-5 w-5" /> {phone.display}
+          </a>
+        </div>
+      </div>
+      <div class="lg:col-span-5">
+        <LandingForm platform={platform} serviceName="Windows" leadSource="Facebook Ads - Windows Product" cta="Get My Free Window Quote" id="quote" />
+      </div>
+    </div>
+  </section>
+
+  <StatsBand />
+
+  <!-- VSL: see the product installed -->
+  {vsl && (
+    <section class="section bg-white">
+      <div class="container-x grid items-center gap-10 lg:grid-cols-2">
+        <div>
+          <p class="kicker text-orange-700">Watch a real install</p>
+          <h2 class="h-section mt-2">See the windows on a real Fresno home</h2>
+          <p class="mt-4 max-w-prose text-slate-600">
+            This is an actual Anlin installation for a Central Valley family. Sixty seconds shows
+            you the product, the crew, and the finish quality better than any brochure.
+          </p>
+          <a href="#quote" class="btn-primary mt-7">Get My Free Window Quote</a>
+        </div>
+        <div>
+          <video
+            controls
+            preload="none"
+            playsinline
+            poster={vsl.poster}
+            class="aspect-video w-full rounded-none border border-navy-600/20 bg-navy-950 object-cover"
+            title={vsl.title}
+          >
+            <source src={vsl.src} type="video/mp4" />
+          </video>
+          {vsl.transcript && (
+            <details class="mt-3 text-sm text-slate-600">
+              <summary class="cursor-pointer font-semibold text-navy-700">Read the video transcript</summary>
+              <p class="mt-2 max-w-prose">{vsl.transcript}</p>
+            </details>
+          )}
+        </div>
+      </div>
+    </section>
+  )}
+
+  <!-- Product plates -->
+  <section class="section bg-navy-50 bg-blueprint-light">
+    <div class="container-x">
+      <p class="kicker text-orange-700">What we install</p>
+      <h2 class="h-section mt-2">The windows we provide</h2>
+      <div class="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        {products.map((p, i) => (
+          <div class="flex flex-col border border-navy-600/20 bg-white">
+            <div class="border-b border-navy-600/10 bg-gradient-to-br from-navy-100 to-navy-200/60 p-5">
+              <img src={p.illustration} alt="" aria-hidden="true" width="380" height="310" loading="lazy" decoding="async" class="mx-auto h-28 w-full object-contain" />
+            </div>
+            <p class="spec-tag">Windows <span class="text-navy-200">·</span> Spec 0{i + 1}</p>
+            <div class="grow p-5">
+              <h3 class="font-display text-lg font-bold uppercase tracking-tight text-navy-800">{p.title}</h3>
+              <p class="mt-2 text-sm text-slate-600">{p.text}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+      <p class="mt-6 max-w-prose text-sm text-slate-600">
+        Every quote includes the {offer.inspectionName.toLowerCase()}: we measure every opening,
+        check seals and drafts, and show you exactly what new glass would save.
+      </p>
+    </div>
+  </section>
+
+  <!-- Before / after -->
+  <BeforeAfter
+    before="/photos/before-after/windows-before.jpg"
+    after="/photos/before-after/windows-after.jpg"
+    beforeAlt="Old single-pane window with security bars before replacement"
+    afterAlt="New dual-pane vinyl window after replacement by Smart Home Improvements"
+    eyebrow="See the difference"
+    heading="Old glass out, new comfort in"
+    sub="A real Central Valley window swap. Drag to compare."
+  />
+
+  <!-- Recent installs -->
+  {photos.length > 0 && (
+    <PhotoGallery items={photos} tone="muted" heading="Recent window installs" eyebrow="Real jobs nearby" />
+  )}
+
+  <Reviews />
+
+  <!-- Final CTA -->
+  <section class="relative overflow-hidden bg-navy-950 bg-blueprint grain py-14 text-white">
+    <div class="container-x flex flex-col items-center gap-6 text-center lg:flex-row lg:justify-between lg:text-left">
+      <div>
+        <p class="kicker text-navy-200">Free in-home assessment</p>
+        <p class="h-sub mt-2 max-w-2xl text-2xl leading-snug">
+          Find out what new windows would actually save you. Free, honest, and no pressure.
+        </p>
+      </div>
+      <div class="flex flex-shrink-0 flex-col gap-3 sm:flex-row">
+        <a href="#quote" class="btn-primary">Get My Free Window Quote</a>
+        <a href={`tel:${phone.raw}`} class="btn-secondary">
+          <Icon name="phone" class="h-5 w-5" /> {phone.display}
+        </a>
+      </div>
+    </div>
+  </section>
+</LandingLayout>

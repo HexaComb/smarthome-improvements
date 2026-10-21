@@ -1,0 +1,160 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { cardSrcset } from '../../lib/images';
+import Icon from '../../components/Icon.astro';
+import CtaBand from '../../components/CtaBand.astro';
+import PageHero from '../../components/PageHero.astro';
+import { site } from '../../data/site';
+import { projects } from '../../data/projects';
+import { caseStudies } from '../../data/caseStudies';
+import { breadcrumbSchema } from '../../lib/schema';
+
+const gallery = Array.from({ length: 12 }, (_, i) => {
+  const n = String(i + 1).padStart(2, '0');
+  const isWindow = i + 1 === 9 || i + 1 === 10;
+  return {
+    src: `/photos/gallery/work-${n}.jpg`,
+    alt: isWindow
+      ? 'Window installation by Smart Home Improvements in the Fresno, CA area'
+      : 'Completed roofing project by Smart Home Improvements in the Central Valley',
+  };
+});
+
+const crumbs = [
+  { name: 'Home', path: '/' },
+  { name: 'Projects', path: '/projects/' },
+];
+
+const roofCount = projects.filter((p) => p.service === 'roofing').length;
+const winCount = projects.filter((p) => p.service === 'windows').length;
+
+const schema = [
+  breadcrumbSchema(crumbs),
+  {
+    '@context': 'https://schema.org',
+    '@type': 'ImageGallery',
+    name: 'Smart Home Improvements project gallery',
+    description: 'Completed roofing and window projects across Fresno and the Central Valley.',
+    image: projects.map((p) => new URL(p.image, site.url).href),
+  },
+];
+---
+
+<Layout
+  title="Our Projects | Roofing & Window Photos in Fresno, CA"
+  description="See real roofing and window replacement projects by Smart Home Improvements across Fresno, Clovis, Visalia, Hanford, and the Central Valley. Licensed CA #1129883."
+  path="/projects/"
+  image={projects[0].image}
+  schema={schema}
+>
+  <PageHero
+    image="/photos/hero/projects.jpg"
+    imageAlt="Isometric illustration of Central Valley homes served by Smart Home Improvements"
+    illustration="/illustrations/neighborhood.svg"
+    crumbs={crumbs}
+    kicker="Our work"
+    title="Projects across the Central Valley"
+    intro={`Real roofs and windows we have installed for homeowners in Fresno, Clovis, Visalia, Hanford, Parlier, and beyond. ${roofCount} roofing and ${winCount} window projects shown.`}
+    eager={true}
+  />
+
+  <!-- Featured case studies -->
+  {
+    caseStudies.length > 0 && (
+      <section class="section">
+        <div class="container-x">
+          <div class="mx-auto max-w-2xl text-center">
+            <p class="kicker text-orange-700">Featured project</p>
+            <h2 class="mt-2 h-section">Case studies</h2>
+            <p class="mt-4 text-slate-600">A closer look at a real job, start to finish, with before and after.</p>
+          </div>
+          <div class="mt-10 grid gap-6">
+            {caseStudies.map((c) => (
+              <a href={`/projects/${c.slug}/`} class="group grid overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 transition hover:shadow-lg md:grid-cols-2">
+                <div class="aspect-[4/3] overflow-hidden md:aspect-auto">
+                  <img src={c.image} srcset={cardSrcset(c.image)} sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 92vw" alt={c.imageAlt} width="1400" height="1050" loading="lazy" decoding="async" class="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+                </div>
+                <div class="flex flex-col justify-center p-7 lg:p-10">
+                  <p class="kicker text-orange-700">{c.city} case study</p>
+                  <h3 class="font-display mt-2 text-2xl font-bold uppercase tracking-tight text-navy-700 sm:text-3xl">{c.title}</h3>
+                  <p class="mt-3 text-slate-600">{c.summary}</p>
+                  <span class="mt-5 inline-flex items-center gap-1 font-semibold text-navy-700 group-hover:text-orange-600">
+                    Read the case study <Icon name="arrow" class="h-4 w-4 transition group-hover:translate-x-1" />
+                  </span>
+                </div>
+              </a>
+            ))}
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  <section class="section bg-slate-50">
+    <div class="container-x">
+      <div class="mx-auto max-w-2xl text-center">
+        <p class="kicker text-orange-700">All projects</p>
+        <h2 class="mt-2 h-section">Recent jobs by city</h2>
+      </div>
+      <div class="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {
+          projects.map((p) => (
+            <figure class="group overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-100">
+              <div class="relative aspect-[4/3] overflow-hidden">
+                <img
+                  src={p.image}
+                  srcset={cardSrcset(p.image)}
+                  sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 92vw"
+                  alt={p.alt}
+                  width="1400"
+                  height="1050"
+                  loading="lazy"
+                  decoding="async"
+                  class="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                />
+                <span class="absolute left-3 top-3 rounded-full bg-navy-700/90 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white">
+                  {p.service}
+                </span>
+              </div>
+              <figcaption class="p-5">
+                <h2 class="font-display text-lg font-bold uppercase tracking-tight text-navy-700">
+                  {p.title}
+                </h2>
+                <p class="mt-1 flex items-center gap-1.5 text-sm font-medium text-orange-600">
+                  <Icon name="map" class="h-4 w-4" /> {p.city}
+                </p>
+                <p class="mt-2 text-sm text-slate-600">{p.blurb}</p>
+              </figcaption>
+            </figure>
+          ))
+        }
+      </div>
+
+      <p class="mt-10 text-center text-sm text-slate-500">
+        Photos are of real Smart Home Improvements projects. Licensed CA #{site.license}.
+      </p>
+    </div>
+  </section>
+
+  <!-- More from our work (photo gallery) -->
+  <section class="section bg-slate-50">
+    <div class="container-x">
+      <div class="mx-auto max-w-2xl text-center">
+        <p class="kicker text-orange-700">More from the field</p>
+        <h2 class="mt-2 h-section">Recent work across the Valley</h2>
+        <p class="mt-4 text-slate-600">A look at more roofs and windows we have completed for Central Valley homeowners.</p>
+      </div>
+      <div class="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        {
+          gallery.map((g) => (
+            <div class="aspect-[4/3] overflow-hidden rounded-xl ring-1 ring-slate-200">
+              <img src={g.src} srcset={cardSrcset(g.src)} sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 92vw" alt={g.alt} width="1200" height="900" loading="lazy" decoding="async" class="h-full w-full object-cover transition duration-500 hover:scale-105" />
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <CtaBand heading="Want results like these?" />
+</Layout>

@@ -1,0 +1,38 @@
+---
+import { areas } from '../data/areas';
+interface Props {
+  service?: string; // e.g. "roofing", "window", "insulation"
+  heading?: string;
+  tone?: 'light' | 'muted';
+}
+const { service = 'home improvement', heading, title } = Astro.props as Props & { title?: string };
+const cap = service.charAt(0).toUpperCase() + service.slice(1);
+const h3 = heading ?? `Local ${cap} Help Across the Central Valley`;
+---
+
+<section class="section bg-white">
+  <div class="container-x">
+    <p class="kicker text-orange-700">Service Areas</p>
+    <h2 class="mt-2 h-section">{h3}</h2>
+    <p class="mt-4 max-w-3xl text-slate-600">
+      We serve homeowners across Fresno and the surrounding Central Valley. Here is the
+      city-by-city breakdown for the communities we cover:
+    </p>
+    <ul class="mt-8 grid gap-x-8 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
+      {
+        areas.map((a) => (
+          <li>
+            <a
+              href={`/service-areas/${a.slug}/`}
+              class="group inline-flex items-baseline gap-1 font-semibold text-navy-700 underline decoration-orange-300 decoration-2 underline-offset-4 hover:text-orange-600"
+            >
+              {a.city} {service}
+              <span class="text-orange-500 transition group-hover:translate-x-0.5">→</span>
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+    <a href="/service-areas/" class="mt-8 inline-flex btn-outline">View all service areas</a>
+  </div>
+</section>

@@ -1,0 +1,83 @@
+---
+// FAQ hub: every question already answered on the service pages, in one
+// place, grouped by service, with FAQPage schema. Answer engines love this
+// and homeowners actually read it.
+import Layout from '../layouts/Layout.astro';
+import Breadcrumbs from '../components/Breadcrumbs.astro';
+import Icon from '../components/Icon.astro';
+import PromiseBand from '../components/PromiseBand.astro';
+import CtaBand from '../components/CtaBand.astro';
+import { services } from '../data/serviceContent';
+import { breadcrumbSchema, faqSchema } from '../lib/schema';
+
+const crumbs = [
+  { name: 'Home', path: '/' },
+  { name: 'FAQ', path: '/faq/' },
+];
+
+// Group: service hub FAQs first, then each sub-service's FAQs.
+const groups = services.map((s) => ({
+  slug: s.slug,
+  name: s.name,
+  faqs: [
+    ...s.faqs.map((f) => ({ ...f, from: s.name, path: `/${s.slug}/` })),
+    ...s.children.flatMap((c) => c.faqs.map((f) => ({ ...f, from: c.name, path: `/${s.slug}/${c.slug}/` }))),
+  ],
+}));
+const all = groups.flatMap((g) => g.faqs);
+const schema = [breadcrumbSchema(crumbs), faqSchema(all)];
+---
+
+<Layout
+  title="Roofing, Window & Insulation FAQs for Fresno Homeowners"
+  description={`${all.length} straight answers about roofing, replacement windows, and insulation in Fresno and the Central Valley: costs, permits, timelines, warranties, and what to expect.`}
+  path="/faq/"
+  schema={schema}
+>
+  <section class="relative overflow-hidden bg-navy-900 bg-blueprint grain text-white">
+    <div class="container-x relative py-12 lg:py-16">
+      <Breadcrumbs items={crumbs} light={true} />
+      <p class="kicker mt-6 text-orange-400">Every question, answered</p>
+      <h1 class="h-hero mt-2">Ask us anything.<br /><span class="text-orange-400">Here is what people ask most.</span></h1>
+      <div class="rule-dim mt-5 w-24 text-orange-500" aria-hidden="true"></div>
+      <p class="mt-6 max-w-2xl text-lg text-navy-100">
+        {all.length} answers across roofing, windows, and insulation. If yours is not here, call or text and a real person answers.
+        Want the deeper homework? Every free guide, cost breakdown, and tool lives on the
+        <a href="/resources/" class="underline hover:text-orange-400">resources page</a>.
+      </p>
+      <nav class="mt-6 flex flex-wrap gap-2" aria-label="FAQ sections">
+        {groups.map((g) => (
+          <a href={`#${g.slug}`} class="spec-tag hover:bg-orange-500 hover:text-navy-950">{g.name} ({g.faqs.length})</a>
+        ))}
+      </nav>
+    </div>
+    <div class="rule-dim text-navy-200/40" aria-hidden="true"></div>
+  </section>
+
+  {groups.map((g, gi) => (
+    <section id={g.slug} class:list={['section scroll-mt-20', gi % 2 === 1 && 'bg-navy-50 bg-blueprint-light']}>
+      <div class="container-x max-w-3xl">
+        <div class="flex items-center gap-3">
+          <span class="sheet-no" aria-hidden="true">0{gi + 1}</span>
+          <h2 class="font-display text-3xl font-bold uppercase tracking-tight text-navy-900">{g.name}</h2>
+          <a href={`/${g.slug}/`} class="ml-auto text-sm font-semibold text-navy-700 underline">See {g.name.toLowerCase()} services</a>
+        </div>
+        <div class="mt-6 divide-y divide-navy-600/10 border-y border-navy-600/15">
+          {g.faqs.map((f) => (
+            <details class="group py-4">
+              <summary class="flex cursor-pointer list-none items-start justify-between gap-4 font-semibold text-navy-800">
+                {f.q}
+                <Icon name="arrow" class="mt-1 h-4 w-4 flex-shrink-0 rotate-90 text-orange-500 transition-transform group-open:-rotate-90" />
+              </summary>
+              <p class="mt-2 max-w-prose text-slate-600">{f.a}</p>
+              <p class="mt-2 text-xs text-slate-500">From <a href={f.path} class="underline hover:text-navy-700">{f.from}</a></p>
+            </details>
+          ))}
+        </div>
+      </div>
+    </section>
+  ))}
+
+  <PromiseBand />
+  <CtaBand heading="Still have a question? Ask a real person." />
+</Layout>

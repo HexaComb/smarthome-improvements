@@ -1,0 +1,183 @@
+---
+// Shared interactions: scroll-reveal, count-up numbers, and image lightbox.
+// Included once near </body> in every layout.
+---
+
+<!-- Lightbox overlay -->
+<div class="lb-overlay" id="lightbox" role="dialog" aria-modal="true" aria-label="Image viewer">
+  <button class="lb-btn" data-lb-close style="top:1rem;right:1rem" aria-label="Close">&times;</button>
+  <button class="lb-btn" data-lb-prev style="left:1rem;top:50%;transform:translateY(-50%)" aria-label="Previous">&#8249;</button>
+  <button class="lb-btn" data-lb-next style="right:1rem;top:50%;transform:translateY(-50%)" aria-label="Next">&#8250;</button>
+  <img id="lb-img" src="" alt="" />
+  <p id="lb-status" class="sr-only" aria-live="polite" aria-atomic="true"></p>
+</div>
+
+<script is:inline>
+  (function () {
+    function setupReveal() {
+      if (!('IntersectionObserver' in window)) {
+        document.querySelectorAll('.reveal').forEach(function (el) { el.classList.add('is-visible'); });
+        return;
+      }
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) { e.target.classList.add('is-visible'); io.unobserve(e.target); }
+        });
+      }, { threshold: 0.12, rootMargin: '0px 0px -6% 0px' });
+      document.querySelectorAll('[data-stagger]').forEach(function (group) {
+        Array.prototype.forEach.call(group.children, function (el, i) {
+          if (el.classList.contains('reveal')) return;
+          el.classList.add('reveal');
+          el.style.transitionDelay = Math.min(i * 70, 420) + 'ms';
+        });
+      });
+      document.querySelectorAll('.reveal:not(.is-visible)').forEach(function (el) { io.observe(el); });
+    }
+
+    function setupCounters() {
+      // Real values are server-rendered; the count-up is enhancement only.
+      var els = document.querySelectorAll('[data-count]');
+      if (!els.length) return;
+      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      if (!('IntersectionObserver' in window)) return;
+      function run(el) {
+        var target = parseFloat(el.getAttribute('data-count') || '0');
+        var decimals = (el.getAttribute('data-count') || '').indexOf('.') >= 0 ? 1 : 0;
+        var suffix = el.getAttribute('data-suffix') || '';
+        var dur = 1100, start = performance.now();
+        function step(now) {
+          var p = Math.min((now - start) / dur, 1);
+          var eased = 1 - Math.pow(1 - p, 3);
+          el.textContent = (target * eased).toFixed(decimals) + suffix;
+          if (p < 1) requestAnimationFrame(step);
+          else el.textContent = target.toFixed(decimals) + suffix;
+        }
+        requestAnimationFrame(step);
+      }
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) { if (e.isIntersecting) { run(e.target); io.unobserve(e.target); } });
+      }, { threshold: 0.5 });
+      els.forEach(function (el) { io.observe(el); });
+    }
+
+    function setupLightbox() {
+      var overlay = document.getElementById('lightbox');
+      var img = document.getElementById('lb-img');
+      if (!overlay || !img) return;
+      var status = document.getElementById('lb-status');
+      var group = [], idx = 0, opener = null;
+      function show(i) {
+        idx = (i + group.length) % group.length;
+        img.src = group[idx].getAttribute('data-full') || group[idx].src;
+        img.alt = group[idx].alt || '';
+        // Announce position (and the image description) to screen readers.
+        if (status) status.textContent = 'Image ' + (idx + 1) + ' of ' + group.length + (img.alt ? ': ' + img.alt : '');
+      }
+      function open(el) {
+        var name = el.getAttribute('data-lb') || 'default';
+        group = Array.prototype.slice.call(document.querySelectorAll('img[data-lb="' + name + '"]'));
+        show(group.indexOf(el));
+        overlay.classList.add('open');
+        document.body.style.overflow = 'hidden';
+        // Keyboard support: remember the opener, move focus into the dialog.
+        opener = document.activeElement;
+        var c0 = overlay.querySelector('[data-lb-close]');
+        if (c0) c0.focus();
+      }
+      function close() {
+        overlay.classList.remove('open');
+        document.body.style.overflow = '';
+        if (opener && opener.focus) opener.focus();
+        opener = null;
+      }
+      document.querySelectorAll('img[data-lb]').forEach(function (el) {
+        // Galleries wrap the img in a real <button> for keyboard access; fall
+        // back to the img itself where no button exists.
+        var t = el.closest('button') || el;
+        t.addEventListener('click', function () { open(el); });
+      });
+      var c = overlay.querySelector('[data-lb-close]');
+      var n = overlay.querySelector('[data-lb-next]');
+      var p = overlay.querySelector('[data-lb-prev]');
+      if (c) c.addEventListener('click', close);
+      if (n) n.addEventListener('click', function (e) { e.stopPropagation(); show(idx + 1); });
+      if (p) p.addEventListener('click', function (e) { e.stopPropagation(); show(idx - 1); });
+      overlay.addEventListener('click', function (e) { if (e.target === overlay || e.target === img) close(); });
+      document.addEventListener('keydown', function (e) {
+        if (!overlay.classList.contains('open')) return;
+        if (e.key === 'Escape') close();
+        if (e.key === 'ArrowRight') show(idx + 1);
+        if (e.key === 'ArrowLeft') show(idx - 1);
+        if (e.key === 'Tab') {
+          // Focus trap: Tab cycles through the dialog's buttons only.
+          var f = overlay.querySelectorAll('button');
+          if (!f.length) return;
+          var first = f[0], last = f[f.length - 1];
+          if (!overlay.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+          else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+          else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+        }
+      });
+    }
+
+    function setupFormGuard() {
+      // Pending state + double-submit protection for the lead forms. Honeypot
+      // rejection happens server-side in /api/lead.ts, never silently here.
+      var pending = [];
+      document.querySelectorAll('form[action="/api/lead/"]').forEach(function (f) {
+        f.addEventListener('submit', function (e) {
+          if (f.dataset.submitted) { e.preventDefault(); return; }
+          if (!f.checkValidity()) return; // let native validation show its message
+          f.dataset.submitted = '1';
+          var btn = f.querySelector('button[type="submit"]');
+          if (btn) {
+            pending.push({ btn: btn, text: btn.textContent, form: f });
+            btn.disabled = true;
+            btn.textContent = 'Sending...';
+          }
+        });
+      });
+      // Back from /thank-you/ restores the page from bfcache: re-arm the forms.
+      window.addEventListener('pageshow', function () {
+        pending.forEach(function (p) {
+          delete p.form.dataset.submitted;
+          p.btn.disabled = false;
+          p.btn.textContent = p.text;
+        });
+        pending.length = 0;
+      });
+    }
+
+    function setupAttribution() {
+      // Capture UTMs + ad click IDs on landing; persist first-touch and
+      // last-touch in a first-party cookie the lead endpoint reads server-side.
+      var qs = new URLSearchParams(location.search);
+      var clickIds = ['gclid','gbraid','wbraid','fbclid','msclkid','ttclid','li_fat_id'];
+      var cur = {}, touched = false;
+      // Capture EVERY utm_* param (source, medium, campaign, term, content, id, etc.).
+      qs.forEach(function (v, k) { if (/^utm_/i.test(k) && v) { cur[k.toLowerCase()] = v.slice(0, 300); touched = true; } });
+      clickIds.forEach(function (k) { var v = qs.get(k); if (v) { cur[k] = v.slice(0, 300); touched = true; } });
+      function rc(n) { var m = document.cookie.match('(^|; )' + n + '=([^;]*)'); return m ? decodeURIComponent(m[2]) : ''; }
+      function wc(n, v) { var d = new Date(); d.setTime(d.getTime() + 90 * 864e5); document.cookie = n + '=' + encodeURIComponent(v) + ';expires=' + d.toUTCString() + ';path=/;SameSite=Lax'; }
+      var store = {};
+      try { store = JSON.parse(rc('sh_attr') || '{}'); } catch (e) { store = {}; }
+      var ref = document.referrer || '';
+      try { if (ref && new URL(ref).host === location.host) ref = ''; } catch (e) {}
+      var touch = { url: location.href.slice(0, 500), path: location.pathname, referrer: ref, ts: new Date().toISOString() };
+      for (var k in cur) touch[k] = cur[k];
+      if (!store.first) store.first = touch;          // first touch: write once, keep for 90 days
+      if (touched || !store.last) store.last = touch; // last touch: refresh whenever new params arrive
+      try { wc('sh_attr', JSON.stringify(store)); } catch (e) {}
+    }
+
+    function init() {
+      try { setupReveal(); } catch (e) {}
+      try { setupCounters(); } catch (e) {}
+      try { setupLightbox(); } catch (e) {}
+      try { setupFormGuard(); } catch (e) {}
+      try { setupAttribution(); } catch (e) {}
+    }
+    if (document.readyState !== 'loading') init();
+    else document.addEventListener('DOMContentLoaded', init);
+  })();
+</script>

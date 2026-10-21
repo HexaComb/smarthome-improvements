@@ -1,0 +1,50 @@
+---
+import Icon from './Icon.astro';
+import YouTubeEmbed from './YouTubeEmbed.astro';
+import { youtubeChannel, type Video } from '../data/videos';
+
+interface Props {
+  items: Video[];
+  eyebrow?: string;
+  heading?: string;
+  sub?: string;
+  tone?: 'light' | 'dark';
+}
+const {
+  items,
+  eyebrow = 'On YouTube',
+  heading = 'See us in action',
+  sub = 'Real jobs and happy customers from our YouTube channel. Tap to watch.',
+  tone = 'dark',
+} = Astro.props;
+const dark = tone === 'dark';
+const cols = items.length >= 4 ? 'sm:grid-cols-2 lg:grid-cols-4' : items.length === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2';
+---
+
+<section class:list={['section', dark ? 'bg-navy-900 text-white' : 'bg-white']}>
+  <div class="container-x">
+    <div class="mx-auto max-w-2xl text-center">
+      <p class="kicker text-orange-400">{eyebrow}</p>
+      <h2 class:list={['mt-2 font-display text-3xl font-bold uppercase tracking-tight sm:text-4xl', dark ? 'text-white' : 'text-navy-700']}>{heading}</h2>
+      <p class:list={['mt-4', dark ? 'text-navy-100' : 'text-slate-600']}>{sub}</p>
+    </div>
+    <div class:list={['mx-auto mt-10 flex max-w-5xl snap-x snap-mandatory gap-4 overflow-x-auto pb-2 sm:grid sm:gap-5 sm:overflow-visible sm:pb-0', cols]} data-stagger>
+      {items.map((v) =>
+        v.src ? (
+          <figure class="w-64 shrink-0 snap-center overflow-hidden border border-white/15 bg-black sm:w-auto">
+            <video controls preload="none" playsinline poster={v.poster} title={v.title} class="aspect-[9/16] h-full w-full object-cover">
+              <source src={v.src} type="video/mp4" />
+            </video>
+          </figure>
+        ) : (
+          <YouTubeEmbed id={v.id} title={v.title} vertical={true} class="w-64 shrink-0 snap-center sm:w-auto" />
+        ),
+      )}
+    </div>
+    <div class="mt-8 text-center">
+      <a href={youtubeChannel} target="_blank" rel="noopener" class="btn-primary">
+        <Icon name="arrow" class="h-5 w-5" /> Watch more on YouTube
+      </a>
+    </div>
+  </div>
+</section>

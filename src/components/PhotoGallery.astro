@@ -1,0 +1,53 @@
+---
+import type { GalleryPhoto } from '../data/gallery';
+import { cardSrcset } from '../lib/images';
+interface Props {
+  items: GalleryPhoto[];
+  eyebrow?: string;
+  heading: string;
+  sub?: string;
+  tone?: 'light' | 'muted';
+  group?: string;
+}
+const { items, eyebrow = 'More from the field', heading, sub, tone = 'light', group } = Astro.props;
+const lb = (group ?? heading).toLowerCase().replace(/[^a-z0-9]+/g, '-');
+---
+
+<section class:list={['section', tone === 'muted' ? 'bg-slate-50' : 'bg-white']}>
+  <div class="container-x">
+    <div class="mx-auto max-w-2xl text-center">
+      <p class="kicker text-orange-700">{eyebrow}</p>
+      <h2 class="mt-2 h-section">{heading}</h2>
+      {sub && <p class="mt-4 text-slate-600">{sub}</p>}
+    </div>
+    <div class="mt-10 columns-2 gap-4 sm:columns-3 lg:columns-4 [&>*]:mb-4" data-stagger>
+      {
+        items.map((g) => (
+          <figure class="lift group relative break-inside-avoid overflow-hidden rounded-2xl shadow-sm ring-1 ring-slate-200">
+            <button type="button" class="block w-full cursor-zoom-in focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500" aria-label={`View larger: ${g.alt}`}>
+              <img
+                data-lb={lb}
+                data-full={g.src}
+                src={g.src}
+                srcset={cardSrcset(g.src)}
+                sizes="(min-width: 1024px) 22vw, (min-width: 640px) 30vw, 45vw"
+                alt={g.alt}
+                width="1200"
+                height="900"
+                loading="lazy"
+                decoding="async"
+                class="w-full"
+              />
+            </button>
+            <figcaption class="pointer-events-none absolute inset-x-0 bottom-0 translate-y-2 bg-gradient-to-t from-navy-900/85 to-transparent p-4 text-sm font-medium text-white opacity-0 transition duration-300 group-hover:translate-y-0 group-hover:opacity-100">
+              {g.alt}
+            </figcaption>
+            <span class="pointer-events-none absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-white/90 text-navy-700 opacity-0 shadow transition group-hover:opacity-100">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3M11 8v6M8 11h6" /></svg>
+            </span>
+          </figure>
+        ))
+      }
+    </div>
+  </div>
+</section>

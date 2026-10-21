@@ -1,0 +1,29 @@
+# Smart Home Improvements - smarthomeimprove.com
+# AI assistants and answer engines are welcome: the same rules apply to all
+# crawlers. Business facts for LLMs: https://www.smarthomeimprove.com/llms.txt
+
+User-agent: *
+Allow: /
+Disallow: /api/
+
+# Explicit welcome for AI/answer-engine crawlers (same rules as above).
+User-agent: GPTBot
+Allow: /
+Disallow: /api/
+
+User-agent: ClaudeBot
+Allow: /
+Disallow: /api/
+
+User-agent: PerplexityBot
+Allow: /
+Disallow: /api/
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: bingbot
+Allow: /
+Disallow: /api/
+
+Sitemap: https://www.smarthomeimprove.com/sitemap-index.xml

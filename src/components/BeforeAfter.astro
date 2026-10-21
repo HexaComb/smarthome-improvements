@@ -1,0 +1,82 @@
+---
+import { cardSrcset } from '../lib/images';
+interface Props {
+  before: string;
+  after: string;
+  beforeAlt: string;
+  afterAlt: string;
+  eyebrow?: string;
+  heading?: string;
+  sub?: string;
+}
+const {
+  before,
+  after,
+  beforeAlt,
+  afterAlt,
+  eyebrow = 'See the difference',
+  heading = 'Before and after',
+  sub = 'Drag the slider to see a real Smart Home Improvements transformation.',
+} = Astro.props;
+---
+
+<section class="section bg-slate-50">
+  <div class="container-x">
+    <div class="mx-auto max-w-2xl text-center">
+      <p class="kicker text-orange-700">{eyebrow}</p>
+      <h2 class="mt-2 h-section">{heading}</h2>
+      <p class="mt-4 text-slate-600">{sub}</p>
+    </div>
+
+    <div class="mx-auto mt-10 max-w-3xl">
+      <div
+        data-ba
+        class="relative select-none overflow-hidden rounded-2xl shadow-xl ring-1 ring-slate-200"
+      >
+        <img src={after} srcset={cardSrcset(after)} sizes="(min-width: 768px) 640px, 92vw" alt={afterAlt} width="1400" height="1050" loading="lazy" decoding="async" class="block w-full" />
+        <div class="ba-clip pointer-events-none absolute inset-y-0 left-0 overflow-hidden" style="width:50%">
+          <img src={before} srcset={cardSrcset(before)} sizes="(min-width: 768px) 640px, 92vw" alt={beforeAlt} width="1400" height="1050" loading="lazy" decoding="async" class="ba-before-img absolute inset-y-0 left-0 h-full max-w-none object-cover" />
+        </div>
+
+        <!-- labels -->
+        <span class="font-display pointer-events-none absolute left-4 top-4 rounded-full bg-navy-900/80 px-3 py-1 text-xs font-bold uppercase tracking-wide text-white">Before</span>
+        <span class="font-display pointer-events-none absolute right-4 top-4 rounded-full bg-orange-500 px-3 py-1 text-xs font-bold uppercase tracking-wide text-navy-950">After</span>
+
+        <!-- divider + handle -->
+        <div class="ba-line pointer-events-none absolute inset-y-0 w-0.5 -translate-x-1/2 bg-white" style="left:50%">
+          <span class="absolute top-1/2 left-1/2 grid h-11 w-11 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-white text-navy-700 shadow-lg ring-1 ring-slate-200">
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M9 6l-4 6 4 6M15 6l4 6-4 6" />
+            </svg>
+          </span>
+        </div>
+
+        <input type="range" min="0" max="100" value="50" aria-label="Drag to compare before and after" class="ba-range absolute inset-0 m-0 h-full w-full cursor-ew-resize appearance-none bg-transparent opacity-0" />
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  function initBeforeAfter() {
+    document.querySelectorAll('[data-ba]').forEach((el) => {
+      const root = el as HTMLElement;
+      const clip = root.querySelector('.ba-clip') as HTMLElement | null;
+      const beforeImg = root.querySelector('.ba-before-img') as HTMLElement | null;
+      const line = root.querySelector('.ba-line') as HTMLElement | null;
+      const range = root.querySelector('.ba-range') as HTMLInputElement | null;
+      if (!clip || !beforeImg || !line || !range) return;
+      const size = () => (beforeImg.style.width = root.clientWidth + 'px');
+      const set = (v: number) => {
+        clip.style.width = v + '%';
+        line.style.left = v + '%';
+      };
+      range.addEventListener('input', () => set(Number(range.value)));
+      window.addEventListener('resize', size);
+      size();
+      set(50);
+    });
+  }
+  initBeforeAfter();
+  document.addEventListener('astro:after-swap', initBeforeAfter);
+</script>

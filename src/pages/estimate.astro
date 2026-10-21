@@ -1,0 +1,267 @@
+---
+// Instant estimate tool: a homeowner answers four questions and gets an
+// honest price bracket in 60 seconds, BEFORE giving contact info. Brackets
+// come from src/data/estimate.ts (same numbers as the blog cost guides).
+// The lead form then submits the inputs + range to /api/lead as a normal
+// lead ("Website - Instant Estimate"), which routes to the right pipeline
+// and offers self-booking on the thank-you page.
+import Layout from '../layouts/Layout.astro';
+import Breadcrumbs from '../components/Breadcrumbs.astro';
+import Honeypot from '../components/Honeypot.astro';
+import FormConsent from '../components/FormConsent.astro';
+import Icon from '../components/Icon.astro';
+import PromiseBand from '../components/PromiseBand.astro';
+import { site } from '../data/site';
+import { windowEstimate, roofEstimate } from '../data/estimate';
+import { breadcrumbSchema, faqSchema } from '../lib/schema';
+
+const crumbs = [
+  { name: 'Home', path: '/' },
+  { name: 'Instant Estimate', path: '/estimate/' },
+];
+const faqs = [
+  { q: 'How accurate is the instant estimate?', a: 'It is a real price bracket for Fresno-area homes based on the same ranges we publish in our cost guides. Your exact number comes from the free in-home assessment, where we measure every opening or every roof plane and put an itemized quote in writing.' },
+  { q: 'Do I have to give my contact info to see the price?', a: 'No. The range shows first. Contact info is only for booking the free assessment that turns the range into an exact quote.' },
+  { q: 'Why is it a range and not a single price?', a: 'Because the honest answer depends on things we can only confirm on site: frame condition, roof decking, access, tempered-glass requirements, and material choices. Anyone who gives you a single number over the phone is guessing.' },
+  { q: 'Is the assessment really free?', a: 'Yes, with no obligation. If a repair makes more sense than a replacement, we tell you that at the assessment.' },
+];
+const schema = [breadcrumbSchema(crumbs), faqSchema(faqs)];
+const formReady = site.formAccessKey.length > 0;
+const inputCls = 'w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-200';
+const brackets = { windows: windowEstimate, roofing: roofEstimate };
+---
+
+<Layout
+  title="Instant Estimate: Price Your Windows or Roof in 60 Seconds"
+  description="Get an honest Fresno price range for replacement windows or a new roof in under a minute. No sales call, no pressure. Then book a free in-home assessment for the exact quote."
+  path="/estimate/"
+  schema={schema}
+>
+  <section class="relative overflow-hidden bg-navy-900 bg-blueprint grain text-white">
+    <div class="container-x relative py-12 lg:py-16">
+      <Breadcrumbs items={crumbs} light={true} />
+      <p class="kicker mt-6 text-orange-400">Instant estimate</p>
+      <h1 class="h-hero mt-2">Price your project<br /><span class="text-orange-400">in 60 seconds</span></h1>
+      <div class="rule-dim mt-5 w-24 text-orange-500" aria-hidden="true"></div>
+      <p class="mt-6 max-w-2xl text-lg text-navy-100">
+        Four questions, an honest Fresno price bracket, no phone call required. The range shows before we ask for anything.
+        Ready for the exact number? Book the free assessment at the end.
+      </p>
+    </div>
+    <div class="rule-dim text-navy-200/40" aria-hidden="true"></div>
+  </section>
+
+  <section class="section">
+    <div class="container-x grid gap-10 lg:grid-cols-12">
+      <div class="lg:col-span-7">
+        <div id="est" class="border border-navy-600/20 bg-white">
+          <!-- Step 1: service -->
+          <fieldset class="border-b border-navy-600/15 p-6">
+            <legend class="sr-only">What are we pricing?</legend>
+            <p class="kicker num text-navy-500" aria-hidden="true">Step 01 <span class="text-navy-200">·</span> What are we pricing?</p>
+            <div class="mt-4 grid gap-3 sm:grid-cols-2">
+              <label class="est-choice relative cursor-pointer border border-navy-600/20 p-4 pr-12 hover:border-navy-600/60 has-[:checked]:border-orange-500 has-[:checked]:bg-orange-50 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-navy-500 has-[:focus-visible]:ring-offset-2">
+                <input type="radio" name="est_service" value="windows" class="peer sr-only" checked />
+                <span class="flex items-center gap-3"><Icon name="window" class="h-6 w-6 text-navy-700" /><span class="font-display text-lg font-bold uppercase tracking-tight text-navy-800">Replacement windows</span></span>
+                <span class="pointer-events-none absolute right-3 top-1/2 hidden h-5 w-5 -translate-y-1/2 place-items-center rounded-none bg-orange-500 text-white peer-checked:grid" aria-hidden="true"><Icon name="check" class="h-3.5 w-3.5" /></span>
+              </label>
+              <label class="est-choice relative cursor-pointer border border-navy-600/20 p-4 pr-12 hover:border-navy-600/60 has-[:checked]:border-orange-500 has-[:checked]:bg-orange-50 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-navy-500 has-[:focus-visible]:ring-offset-2">
+                <input type="radio" name="est_service" value="roofing" class="peer sr-only" />
+                <span class="flex items-center gap-3"><Icon name="roof" class="h-6 w-6 text-navy-700" /><span class="font-display text-lg font-bold uppercase tracking-tight text-navy-800">New roof</span></span>
+                <span class="pointer-events-none absolute right-3 top-1/2 hidden h-5 w-5 -translate-y-1/2 place-items-center rounded-none bg-orange-500 text-white peer-checked:grid" aria-hidden="true"><Icon name="check" class="h-3.5 w-3.5" /></span>
+              </label>
+            </div>
+          </fieldset>
+
+          <!-- Step 2: windows inputs -->
+          <div id="est-windows" class="border-b border-navy-600/15 p-6">
+            <p class="kicker num text-navy-500">Step 02 <span class="text-navy-200">·</span> Your windows</p>
+            <div class="mt-4 grid gap-4 sm:grid-cols-2">
+              <label class="block text-sm font-medium text-slate-700">How many windows?
+                <input id="w_count" type="number" min="1" max="60" value="10" class:list={[inputCls, 'mt-1']} />
+              </label>
+              <label class="block text-sm font-medium text-slate-700">Large picture, bay, or specialty windows
+                <input id="w_special" type="number" min="0" max="20" value="0" class:list={[inputCls, 'mt-1']} />
+              </label>
+              <label class="block text-sm font-medium text-slate-700">Window tier
+                <select id="w_tier" class:list={[inputCls, 'mt-1 bg-white']}>
+                  <option value="standard">{windowEstimate.perWindow.standard.label}</option>
+                  <option value="premium">{windowEstimate.perWindow.premium.label}</option>
+                </select>
+              </label>
+              <label class="block text-sm font-medium text-slate-700">Install type
+                <select id="w_frame" class:list={[inputCls, 'mt-1 bg-white']}>
+                  <option value="retrofit">Retrofit insert (stucco stays intact, most homes)</option>
+                  <option value="fullframe">Full-frame (rotted or out-of-square frames)</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <!-- Step 2: roofing inputs -->
+          <div id="est-roofing" class="hidden border-b border-navy-600/15 p-6">
+            <p class="kicker num text-navy-500">Step 02 <span class="text-navy-200">·</span> Your roof</p>
+            <div class="mt-4 grid gap-4 sm:grid-cols-2">
+              <label class="block text-sm font-medium text-slate-700">Home square footage (living space)
+                <input id="r_sqft" type="number" min="500" max="8000" step="50" value="1800" class:list={[inputCls, 'mt-1']} />
+              </label>
+              <label class="block text-sm font-medium text-slate-700">Stories
+                <select id="r_stories" class:list={[inputCls, 'mt-1 bg-white']}>
+                  <option value="1">One story</option>
+                  <option value="2">Two stories</option>
+                </select>
+              </label>
+              <label class="block text-sm font-medium text-slate-700">Roof pitch
+                <select id="r_pitch" class:list={[inputCls, 'mt-1 bg-white']}>
+                  {Object.entries(roofEstimate.pitch).map(([k, v]) => <option value={k} selected={k === 'medium'}>{v.label}</option>)}
+                </select>
+              </label>
+              <label class="block text-sm font-medium text-slate-700">Material
+                <select id="r_material" class:list={[inputCls, 'mt-1 bg-white']}>
+                  {Object.entries(roofEstimate.perSquare).map(([k, v]) => <option value={k}>{v.label}</option>)}
+                </select>
+              </label>
+              <label class="block text-sm font-medium text-slate-700">Existing roof layers to remove
+                <select id="r_layers" class:list={[inputCls, 'mt-1 bg-white']}>
+                  <option value="1">One layer (typical)</option>
+                  <option value="2">Two layers</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <!-- Result -->
+          <div class="bg-navy-950 bg-blueprint grain p-6 text-white">
+            <p class="kicker num text-navy-300">Step 03 <span class="text-navy-500">·</span> Your Fresno price bracket</p>
+            <div aria-live="polite" aria-atomic="true">
+              <p id="est-range" class="font-display num mt-2 text-4xl font-bold text-orange-400 sm:text-5xl">$ · · ·</p>
+              <p id="est-detail" class="mt-2 text-sm text-navy-200"></p>
+            </div>
+            <p class="mt-4 max-w-prose text-xs text-navy-300">
+              Installed price bracket for Fresno and Clovis homes, from the same numbers in our published cost guides. Not a quote:
+              frame or decking condition, access, and code-required tempered glass move the number. The free assessment makes it exact.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lock it in -->
+      <div class="lg:col-span-5">
+        <div id="quote" class="scroll-mt-20 overflow-hidden rounded-2xl bg-white text-slate-800 shadow-2xl ring-1 ring-black/5">
+          <div class="h-1.5 w-full bg-gradient-to-r from-orange-500 to-orange-400"></div>
+          <div class="p-6 sm:p-7">
+            <p class="kicker num text-navy-500">Step 04 <span class="text-navy-200">·</span> Optional</p>
+            <h2 class="font-display mt-1 text-2xl font-bold uppercase tracking-tight text-navy-700">Turn the range into an exact quote</h2>
+            <p class="mt-1 text-sm text-slate-500">Free in-home assessment, itemized written quote, no pressure. We bring your inputs with us.</p>
+            {!formReady && <p class="mt-4 rounded-lg bg-orange-50 p-3 text-xs text-orange-700 ring-1 ring-orange-200">Form is being configured. Call us at {site.phone}.</p>}
+            <form method="POST" action="/api/lead/" class="mt-4 grid gap-3" id="est-form">
+              <input type="hidden" name="lead_source" value="Website - Instant Estimate" />
+              <input type="hidden" name="service" id="est-service-field" value="Windows" />
+              <input type="hidden" name="message" id="est-message-field" value="" />
+              <Honeypot />
+              <div class="grid gap-3 sm:grid-cols-2">
+                <input name="name" required aria-label="Full name" autocomplete="name" placeholder="Full name" class={inputCls} />
+                <input name="phone" type="tel" required aria-label="Phone number" autocomplete="tel" inputmode="tel" pattern="[0-9()+\-. ]{10,}" title="Enter a 10 digit phone number" placeholder="Phone" class={inputCls} />
+                <input name="email" type="email" aria-label="Email" autocomplete="email" placeholder="Email" class={inputCls} />
+                <input name="zip" aria-label="ZIP code" autocomplete="postal-code" inputmode="numeric" pattern="[0-9]{5}(-[0-9]{4})?" title="Enter a 5 digit ZIP code" placeholder="ZIP code" class={inputCls} />
+                <input name="address" aria-label="Street address" autocomplete="street-address" placeholder="Street address" class={inputCls} />
+                <input name="city" aria-label="City" autocomplete="address-level2" placeholder="City" class={inputCls} />
+              </div>
+              <button type="submit" disabled={!formReady} class="btn-primary w-full disabled:cursor-not-allowed disabled:opacity-50">Book My Free Assessment</button>
+              <p class="text-center text-xs text-slate-500">Free and no obligation. We respond fast.</p>
+              <FormConsent />
+            </form>
+          </div>
+        </div>
+        <p class="mt-4 text-center text-sm text-slate-500">
+          Prefer to talk? <a href={`tel:${site.phoneRaw}`} class="font-semibold text-navy-700 underline">Call {site.phone}</a> or <a href={`sms:${site.smsRaw}`} class="font-semibold text-navy-700 underline">text us</a>.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section bg-navy-50 bg-blueprint-light">
+    <div class="container-x max-w-3xl">
+      <p class="kicker text-orange-700">Good to know</p>
+      <h2 class="h-section mt-2">Instant estimate questions</h2>
+      <div class="mt-6 divide-y divide-navy-600/10 border-y border-navy-600/15">
+        {faqs.map((f) => (
+          <details class="group py-4">
+            <summary class="flex cursor-pointer list-none items-start justify-between gap-4 font-semibold text-navy-800">{f.q}<Icon name="arrow" class="mt-1 h-4 w-4 flex-shrink-0 rotate-90 text-orange-500 transition-transform group-open:-rotate-90" /></summary>
+            <p class="mt-2 max-w-prose text-slate-600">{f.a}</p>
+          </details>
+        ))}
+      </div>
+      <p class="mt-6 text-sm text-slate-600">
+        Want the long version? Read <a href="/blog/window-replacement-cost-fresno/" class="font-semibold text-navy-700 underline">what window replacement actually costs in Fresno</a>.
+      </p>
+    </div>
+  </section>
+
+  <PromiseBand tone="dark" />
+
+  <script is:inline define:vars={{ brackets }}>
+    (function () {
+      var $ = function (id) { return document.getElementById(id); };
+      var money = function (n) { return '$' + Math.round(n / 100) * 100 .toLocaleString ? ('$' + (Math.round(n / 100) * 100).toLocaleString('en-US')) : ('$' + Math.round(n)); };
+      var fmt = function (n) { return '$' + (Math.round(n / 100) * 100).toLocaleString('en-US'); };
+      function service() { var r = document.querySelector('input[name="est_service"]:checked'); return r ? r.value : 'windows'; }
+      // GA4 funnel events (started -> range shown -> submitted). Fire-once
+      // guards; never let analytics break the calculator.
+      var track = function (name, params) { try { if (window.gtag) window.gtag('event', name, params || {}); } catch (e) {} };
+      var estStarted = false, rangeShown = {};
+      function calc() {
+        var s = service();
+        $('est-windows').classList.toggle('hidden', s !== 'windows');
+        $('est-roofing').classList.toggle('hidden', s !== 'roofing');
+        var min = 0, max = 0, detail = '', summary = '';
+        if (s === 'windows') {
+          var b = brackets.windows;
+          var n = Math.max(0, Number($('w_count').value) || 0);
+          var sp = Math.max(0, Number($('w_special').value) || 0);
+          var tier = b.perWindow[$('w_tier').value] || b.perWindow.standard;
+          min = n * tier.min + sp * b.specialty.min;
+          max = n * tier.max + sp * b.specialty.max;
+          var ff = $('w_frame').value === 'fullframe';
+          if (ff) { min *= b.fullFrame.min; max *= b.fullFrame.max; }
+          detail = n + ' window' + (n === 1 ? '' : 's') + (sp ? ' + ' + sp + ' specialty' : '') + ', ' + tier.label + ', ' + (ff ? 'full-frame' : 'retrofit') + ' install';
+          summary = 'Windows estimate inputs: ' + detail + '. Range shown: ' + fmt(min) + ' to ' + fmt(max) + '.';
+          $('est-service-field').value = 'Windows';
+        } else {
+          var r = brackets.roofing;
+          var sqft = Math.max(0, Number($('r_sqft').value) || 0);
+          var stories = Number($('r_stories').value) || 1;
+          var pitch = r.pitch[$('r_pitch').value] || r.pitch.medium;
+          var mat = r.perSquare[$('r_material').value] || r.perSquare.shingle;
+          var layers = Number($('r_layers').value) || 1;
+          var squares = (sqft / stories) * pitch.factor / 100;
+          min = squares * (mat.min + (layers - 1) * r.extraLayer.min);
+          max = squares * (mat.max + (layers - 1) * r.extraLayer.max);
+          detail = 'About ' + Math.round(squares) + ' roofing squares (' + sqft.toLocaleString('en-US') + ' sq ft home, ' + stories + ' stor' + (stories > 1 ? 'ies' : 'y') + ', ' + pitch.label.toLowerCase() + ' pitch), ' + mat.label + (layers > 1 ? ', 2-layer tear-off' : '');
+          summary = 'Roofing estimate inputs: ' + detail + '. Range shown: ' + fmt(min) + ' to ' + fmt(max) + '.';
+          $('est-service-field').value = 'Roofing';
+        }
+        $('est-range').textContent = min > 0 ? fmt(min) + ' to ' + fmt(max) : '$ · · ·';
+        $('est-detail').textContent = detail;
+        $('est-message-field').value = summary;
+        if (estStarted && min > 0 && !rangeShown[s]) {
+          rangeShown[s] = true;
+          track('estimate_range_shown', { service: s });
+        }
+      }
+      document.querySelectorAll('#est input, #est select').forEach(function (el) {
+        el.addEventListener('input', onInteract);
+        el.addEventListener('change', onInteract);
+      });
+      function onInteract() {
+        if (!estStarted) { estStarted = true; track('estimate_started', { service: service() }); }
+        calc();
+      }
+      var leadForm = document.querySelector('form[action*="/api/lead"]');
+      if (leadForm) leadForm.addEventListener('submit', function () {
+        track('estimate_submitted', { service: service() });
+      });
+      calc();
+    })();
+  </script>
+</Layout>

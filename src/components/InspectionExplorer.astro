@@ -1,0 +1,124 @@
+---
+// Interactive "what our free inspection covers" explorer for landing pages.
+// Click a point to expand its detail AND swap the isometric illustration.
+import Icon from './Icon.astro';
+
+interface Props {
+  fallback: string;
+  inspectionName: string;
+  serviceName: string;
+  points: { icon: string; title: string; text: string; illustration?: string }[];
+}
+const { fallback, inspectionName, serviceName, points } = Astro.props;
+const firstImg = points[0]?.illustration ?? fallback;
+---
+
+<section class="bg-white py-16 sm:py-20">
+  <div class="container-x">
+    <div class="mx-auto max-w-2xl text-center">
+      <p class="kicker text-orange-700">Your free {inspectionName.toLowerCase()}</p>
+      <h2 class="h-section mt-2">What our free inspection covers</h2>
+      <p class="mt-4 text-slate-600">
+        No guesswork and no scare tactics. Tap any point to see exactly what our licensed crew checks, and why it matters for your {serviceName.toLowerCase()}.
+      </p>
+    </div>
+
+    <div class="mt-12 grid items-center gap-10 lg:grid-cols-2 lg:gap-16" data-inspect>
+      <!-- Illustration (swaps on selection) -->
+      <div class="relative order-1 overflow-hidden rounded-3xl bg-gradient-to-br from-navy-800 to-navy-950 p-8 ring-1 ring-navy-200/20">
+        <img src="/brand/mark-white.svg" alt="" aria-hidden="true" class="pointer-events-none absolute -right-10 -top-10 w-56 opacity-[0.05]" />
+        <img
+          src={firstImg}
+          alt={`Isometric illustration of a ${serviceName.toLowerCase()} inspection point`}
+          width="900"
+          height="900"
+          loading="lazy"
+          decoding="async"
+          class="ins-illus relative mx-auto w-full max-w-md drop-shadow-2xl transition-opacity duration-300"
+          data-inspect-img
+        />
+        <div class="relative mt-6 flex items-center justify-center gap-2 text-sm font-semibold text-navy-100">
+          <Icon name="shield" class="h-5 w-5 text-orange-400" /> Documented with photos. Yours to keep.
+        </div>
+      </div>
+
+      <!-- Interactive list -->
+      <div class="order-2 space-y-3">
+        {points.map((p, i) => (
+          <div class:list={['inspect-item overflow-hidden rounded-xl border transition', i === 0 ? 'is-open border-orange-300 shadow-md' : 'border-slate-200']} data-inspect-item>
+            <button
+              type="button"
+              class="flex w-full items-center gap-3 px-4 py-3.5 text-left"
+              data-inspect-btn
+              data-illus={p.illustration ?? fallback}
+              aria-expanded={i === 0 ? 'true' : 'false'}
+            >
+              <span class="inspect-chip grid h-10 w-10 flex-shrink-0 place-items-center rounded-lg bg-navy-50 text-navy-600 transition">
+                <Icon name={p.icon} class="h-5 w-5" />
+              </span>
+              <span class="font-display flex-1 text-base font-bold uppercase tracking-tight text-navy-700">{p.title}</span>
+              <Icon name="arrow" class="inspect-chevron h-5 w-5 flex-shrink-0 text-navy-400 transition" />
+            </button>
+            <div class="inspect-body">
+              <div class="overflow-hidden">
+                <p class="px-4 pb-4 pl-[3.75rem] text-sm leading-relaxed text-slate-600">{p.text}</p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .inspect-body {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.3s ease;
+  }
+  .inspect-item.is-open .inspect-body { grid-template-rows: 1fr; }
+  .inspect-item.is-open .inspect-chip { background: var(--color-orange-500); color: #fff; }
+  .inspect-item.is-open .inspect-chevron { transform: rotate(90deg); color: var(--color-orange-500); }
+  .inspect-item:not(.is-open) button:hover .inspect-chip { background: var(--color-navy-100); }
+  .ins-illus.is-swapping { opacity: 0; }
+</style>
+
+<script is:inline>
+  (function () {
+    document.querySelectorAll('[data-inspect]').forEach(function (group) {
+      var items = group.querySelectorAll('[data-inspect-item]');
+      var img = group.querySelector('[data-inspect-img]');
+      function swap(src) {
+        if (!img || !src || img.getAttribute('src') === src) return;
+        img.classList.add('is-swapping');
+        var done = false;
+        var apply = function () {
+          if (done) return; done = true;
+          img.setAttribute('src', src);
+          img.classList.remove('is-swapping');
+        };
+        setTimeout(apply, 180);
+      }
+      items.forEach(function (item) {
+        var btn = item.querySelector('[data-inspect-btn]');
+        if (!btn) return;
+        btn.addEventListener('click', function () {
+          var open = item.classList.contains('is-open');
+          items.forEach(function (other) {
+            other.classList.remove('is-open', 'border-orange-300', 'shadow-md');
+            other.classList.add('border-slate-200');
+            var b = other.querySelector('[data-inspect-btn]');
+            if (b) b.setAttribute('aria-expanded', 'false');
+          });
+          if (!open) {
+            item.classList.add('is-open', 'border-orange-300', 'shadow-md');
+            item.classList.remove('border-slate-200');
+            btn.setAttribute('aria-expanded', 'true');
+            swap(btn.getAttribute('data-illus'));
+          }
+        });
+      });
+    });
+  })();
+</script>

@@ -1,0 +1,1851 @@
+---
+// Live KPI dashboard. Server-rendered on every request (prerender = false):
+// pulls GoHighLevel opportunities + CallRail calls at view time. Access is
+// gated by ?key=<DASH_KEY env var>. noindex, out of the sitemap, unlinked.
+export const prerender = false;
+
+import Layout from '../layouts/Layout.astro';
+import SectionHead from '../components/SectionHead.astro';
+import { updatesBetween } from '../data/updates';
+import type { WorkLogEntry } from '../lib/kpi';
+import { stuckJobs, runJnSync, runGhlLeadSync } from '../lib/jn';
+import { fetchJnSyncState } from '../lib/kpi';
+import { fetchHits, dayKey } from '../lib/hits';
+import { buildRevenueSummary, priorRange, sparkPoints, type Metric } from '../lib/summary';
+import { fetchArtemisProjects, artemisSummary, artemisAnalytics } from '../lib/artemis';
+import { connectedIntegrations, availableIntegrations } from '../data/integrations';
+import { build360, stageSummary, channelSummary, STAGES } from '../lib/crm360';
+import { runCallSync } from '../lib/callrail';
+import { landingPages, platforms, ga4Ids } from '../data/landing';
+import { site } from '../data/site';
+import { adSpend } from '../data/adspend';
+import {
+  fetchOpportunities,
+  fetchCalls,
+  fetchSpendStore,
+  fetchContactAttribution,
+  makeSpendLookup,
+  buildWeekly,
+  buildMonthly,
+  buildSourceTable,
+  buildCampaignTable,
+  buildAdsetTable,
+  buildCallSources,
+  fetchWorkLog,
+  fetchPipelines,
+  fetchAppointments,
+  fetchAppointmentsRange,
+  fetchJnJobs,
+  fetchJnRevenue,
+  fetchJnContactsIndex,
+  fetchJnPhotos,
+  jnRevenueBySource,
+  buildFunnel,
+  buildPipelineHealth,
+  buildListHealth,
+  weekStart,
+  spendByCampaign,
+  spendByAdset,
+  money,
+  pct,
+  keyOk,
+} from '../lib/kpi';
+
+const envv = (k: string): string =>
+  (typeof process !== 'undefined' && process.env && process.env[k]) || '';
+
+Astro.response.headers.set('Cache-Control', 'no-store');
+
+const DASH_KEY = envv('DASH_KEY').trim();
+const unlocked = keyOk(Astro.url);
+const keyConfigured = DASH_KEY.length > 0;
+const urlKey = Astro.url.searchParams.get('key') || '';
+
+const now = new Date();
+let opps = null;
+let calls = null;
+let attrs = null;
+let spendSaved: Awaited<ReturnType<typeof fetchSpendStore>> = null;
+let workLog: WorkLogEntry[] = [];
+let pipelines: Awaited<ReturnType<typeof fetchPipelines>> = null;
+let appts: Awaited<ReturnType<typeof fetchAppointments>> = null;
+let jnJobs: Awaited<ReturnType<typeof fetchJnJobs>> = null;
+let jnRev: Awaited<ReturnType<typeof fetchJnRevenue>> = null;
+let jnContacts: Awaited<ReturnType<typeof fetchJnContactsIndex>> = null;
+let jnPhotos: Awaited<ReturnType<typeof fetchJnPhotos>> = null;
+// Calendar ids live in the booking widget URLs in site.ts.
+const bookingCals = Object.entries(site.booking).map(([svc, url]) => ({
+  label: svc.charAt(0).toUpperCase() + svc.slice(1),
+  id: url.split('/').filter(Boolean).pop() || '',
+}));
+let weekly: ReturnType<typeof buildWeekly> = [];
+let monthly: ReturnType<typeof buildMonthly> = [];
+let sourceRows: ReturnType<typeof buildSourceTable> = [];
+let campaignRows: ReturnType<typeof buildCampaignTable> = [];
+let adsetRows: ReturnType<typeof buildAdsetTable> = [];
+const yearStart = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
+
+// ---- Performance range selector (?range=...) for "What is producing" ----
+const RANGES: Record<string, { label: string }> = {
+  'this-week': { label: 'This week' },
+  'last-week': { label: 'Last week' },
+  'this-month': { label: 'This month' },
+  'last-month': { label: 'Last month' },
+  '30d': { label: 'Last 30 days' },
+  ytd: { label: `Year to date ${now.getUTCFullYear()}` },
+};
+const rangeKey = RANGES[Astro.url.searchParams.get('range') || ''] ? (Astro.url.searchParams.get('range') as string) : 'ytd';
+const thisWkStart = weekStart(now);
+let perfStart = yearStart;
+let perfEnd: Date | undefined = undefined;
+if (rangeKey === 'this-week') perfStart = thisWkStart;
+else if (rangeKey === 'last-week') {
+  perfStart = new Date(thisWkStart);
+  perfStart.setUTCDate(perfStart.getUTCDate() - 7);
+  perfEnd = thisWkStart;
+} else if (rangeKey === 'this-month') perfStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+else if (rangeKey === 'last-month') {
+  perfStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+  perfEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+} else if (rangeKey === '30d') {
+  perfStart = new Date(now);
+  perfStart.setUTCDate(perfStart.getUTCDate() - 30);
+}
+const rangeLabel = RANGES[rangeKey].label;
+// UTC day keys covering the selected range (for the landing-page visit counter).
+const lpDays: string[] = [];
+{
+  const d = new Date(Date.UTC(perfStart.getUTCFullYear(), perfStart.getUTCMonth(), perfStart.getUTCDate()));
+  const end = perfEnd ?? now;
+  while (d <= end && lpDays.length < 400) {
+    lpDays.push(dayKey(d));
+    d.setUTCDate(d.getUTCDate() + 1);
+  }
+}
+let hits: Awaited<ReturnType<typeof fetchHits>> = null;
+// Revenue summary compares the selected range with the equal-length period before it.
+const sumRange = { start: perfStart, end: perfEnd ?? now };
+const sumPrior = priorRange(sumRange);
+let sumAppts: Awaited<ReturnType<typeof fetchAppointmentsRange>> = null;
+let artemis: Awaited<ReturnType<typeof fetchArtemisProjects>> = null;
+let syncState: Awaited<ReturnType<typeof fetchJnSyncState>> = null;
+const ago = (ms: number): string => {
+  const m = Math.round((Date.now() - ms) / 60000);
+  return m < 60 ? `${m} min ago` : m < 2880 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} d ago`;
+};
+
+if (unlocked) {
+  let workLogRes: Awaited<ReturnType<typeof fetchWorkLog>> = null;
+  // Opportunistic review-engine sync: every dashboard view checks JobNimbus
+  // for newly completed jobs (self-seeds on the first run; 10-minute throttle
+  // keeps it cheap). The cron and webhook cover the hours nobody looks.
+  const syncPromise = Promise.all([runJnSync(10).catch(() => null), runCallSync(false).catch(() => null), runGhlLeadSync(false).catch(() => null)]);
+  [opps, calls, attrs, spendSaved, workLogRes, pipelines, appts, jnJobs, jnRev, jnContacts, jnPhotos] = await Promise.all([
+    fetchOpportunities(),
+    fetchCalls(yearStart, now),
+    fetchContactAttribution(),
+    fetchSpendStore(),
+    fetchWorkLog(),
+    fetchPipelines(),
+    fetchAppointments(bookingCals, 14),
+    fetchJnJobs(),
+    fetchJnRevenue(),
+    fetchJnContactsIndex(),
+    fetchJnPhotos(12),
+  ]);
+  await syncPromise;
+  [hits, sumAppts, artemis, syncState] = await Promise.all([
+    fetchHits(landingPages.map((l) => l.path), lpDays),
+    fetchAppointmentsRange(bookingCals, sumPrior.start, sumRange.end),
+    fetchArtemisProjects(40),
+    fetchJnSyncState(),
+  ]);
+  workLog = workLogRes?.entries ?? [];
+  const spendLookup = makeSpendLookup(spendSaved?.store ?? null);
+  weekly = buildWeekly(opps, calls, 12, now);
+  monthly = buildMonthly(opps, calls, now.getUTCFullYear(), now, spendLookup);
+  sourceRows = buildSourceTable(opps, perfStart, perfEnd);
+  campaignRows = buildCampaignTable(opps, attrs, perfStart, spendByCampaign(spendSaved?.store ?? null, perfStart, perfEnd), perfEnd);
+  adsetRows = buildAdsetTable(opps, attrs, perfStart, spendByAdset(spendSaved?.store ?? null, perfStart, perfEnd), perfEnd);
+}
+const funnel = unlocked ? buildFunnel(opps, perfStart ?? yearStart, now) : null;
+const pipelineRows = unlocked ? buildPipelineHealth(opps, pipelines, yearStart) : [];
+const listHealth = unlocked ? buildListHealth(attrs) : null;
+
+// JobNimbus rollups (milestone 1: read-only ops truth).
+const jnStages = { pipeline: 0, production: 0, done: 0 };
+const jnByStatus = new Map<string, { n: number; windows: number; roofing: number; other: number }>();
+let jnBooked = 0;
+for (const j of jnJobs ?? []) {
+  jnStages[j.stage]++;
+  const row = jnByStatus.get(j.status) || { n: 0, windows: 0, roofing: 0, other: 0 };
+  row.n++;
+  const t = j.type.toLowerCase();
+  if (t === 'windows') row.windows++;
+  else if (t === 'roofing') row.roofing++;
+  else row.other++;
+  jnByStatus.set(j.status, row);
+  jnBooked += j.invTotal || j.estTotal;
+}
+const jnStatusRows = [...jnByStatus.entries()].sort((a, b) => b[1].n - a[1].n);
+const jnStuck = stuckJobs(jnJobs, 14);
+const jnRevRows = jnRev ? jnRevenueBySource(jnRev.items, jnContacts, attrs) : [];
+const ymNow = now.toISOString().slice(0, 7);
+const sumVals = (o: Record<string, number>, pred: (ym: string) => boolean) =>
+  Object.entries(o).reduce((s, [ym, v]) => (pred(ym) ? s + v : s), 0);
+const jnSignedYtd = jnRev ? sumVals(jnRev.byMonthSigned, (ym) => ym.startsWith(String(now.getUTCFullYear()))) : 0;
+const jnPaidYtd = jnRev ? sumVals(jnRev.byMonthPaid, (ym) => ym.startsWith(String(now.getUTCFullYear()))) : 0;
+const jnSignedMtd = jnRev ? jnRev.byMonthSigned[ymNow] || 0 : 0;
+// Signed-estimate dollars are the real revenue signal: override the KPI
+// ledger's GHL-derived revenue for months where JobNimbus has signed totals.
+if (jnRev) {
+  for (const m of monthly) {
+    const r = jnRev.byMonthSigned[m.ym] || 0;
+    if (r > 0) {
+      m.revenue = r;
+      m.roi = m.spend > 0 ? (r - m.spend) / m.spend : null;
+    }
+  }
+}
+const daysAgo = (d: Date) => Math.floor((Date.now() - d.getTime()) / 86400000);
+
+// ---- Landing page stats: visits (first-party beacon) + leads/pipeline (GHL) ----
+const stageInfo = new Map<string, { name: string; position: number }>();
+for (const p of pipelines ?? []) for (const s of p.stages) stageInfo.set(s.id, { name: s.name, position: s.position });
+const inPerf = (d: Date) => d >= perfStart && (!perfEnd || d < perfEnd);
+const lpRows = landingPages.map((lp) => {
+  const leads = (opps ?? []).filter((o) => o.source === lp.leadSource && inPerf(o.createdAt));
+  const stages = new Map<string, number>();
+  for (const o of leads) {
+    const k = o.status === 'won' ? 'Won' : o.status === 'lost' ? 'Lost' : stageInfo.get(o.pipelineStageId)?.name || 'Open';
+    stages.set(k, (stages.get(k) || 0) + 1);
+  }
+  const visits = hits ? hits.range.get(lp.path) ?? 0 : null;
+  return {
+    ...lp,
+    leads: leads.length,
+    won: leads.filter((o) => o.status === 'won').length,
+    value: leads.reduce((s, o) => s + o.value, 0),
+    visits,
+    allTime: hits ? hits.total.get(lp.path) ?? 0 : null,
+    conv: visits ? leads.length / visits : null,
+    stages: [...stages.entries()].sort((a, b) => b[1] - a[1]),
+    recent: [...leads].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, 5),
+  };
+});
+const lpPlatforms = (['facebook', 'google', 'microsoft'] as const).map((p) => {
+  const rows = lpRows.filter((r) => r.platform === p);
+  const visits = hits ? rows.reduce((s, r) => s + (r.visits || 0), 0) : null;
+  const leads = rows.reduce((s, r) => s + r.leads, 0);
+  const sinceYm = perfStart.toISOString().slice(0, 7);
+  const untilYm = (perfEnd ?? now).toISOString().slice(0, 7);
+  const spend = (spendSaved?.store.rows ?? [])
+    .filter((r) => r.platform === p && r.month >= sinceYm && r.month <= untilYm)
+    .reduce((s, r) => s + (Number(r.amount) || 0), 0);
+  const needle = p === 'facebook' ? 'facebook' : p === 'google' ? 'google ads' : 'microsoft';
+  const pcalls = calls ? calls.filter((c) => inPerf(c.at) && c.sourceName.toLowerCase().includes(needle)).length : null;
+  const contacts = leads + (pcalls || 0);
+  return { key: p, name: platforms[p].name, rows, visits, leads, calls: pcalls, spend, cpl: spend > 0 && contacts > 0 ? spend / contacts : null };
+});
+
+// ---- Revenue summary (period vs prior period) ----
+const summary = buildRevenueSummary({
+  range: sumRange,
+  opps,
+  calls,
+  appts: sumAppts,
+  jnJobs,
+  revItems: jnRev?.items ?? [],
+  spendRows: spendSaved?.store.rows ?? [],
+  attrs,
+  jnContacts,
+});
+const rate = (n: number): string => `${(n * 100).toFixed(1)}%`;
+const fmtMetric = (m: Metric): string => {
+  if (m.value == null) return '·';
+  if (m.fmt === 'money') return money(m.value);
+  if (m.fmt === 'pct') return rate(m.value);
+  if (m.fmt === 'x') return `${m.value.toFixed(1)}x`;
+  return String(m.value);
+};
+const deltaClass = (m: Metric): string => {
+  if (m.delta == null) return 'bg-slate-200 text-slate-600';
+  const good = m.badWhenUp ? m.delta <= 0 : m.delta >= 0;
+  return good ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-700';
+};
+const deltaText = (m: Metric): string => (m.delta == null ? 'no baseline' : `${m.delta >= 0 ? '↑' : '↓'} ${Math.abs(m.delta * 100).toFixed(1)}%`);
+const pipeMax = Math.max(1, ...summary.pipeline.map((p) => p.value));
+const sparkMax = (s: { cur: number[]; prev: number[] }) => Math.max(1, ...s.cur, ...s.prev);
+
+// ---- Integrations: live status per connected system ----
+const art = artemis ? artemisSummary(artemis) : null;
+const artAn = artemis ? artemisAnalytics(artemis, sumRange) : null;
+const artMax = artAn ? Math.max(1, ...artAn.monthly.map((m) => Math.max(m.created, m.signed))) : 1;
+const integrationStatus: Record<string, { ok: boolean | null; note: string }> = {
+  ghl: { ok: opps !== null, note: opps ? `${opps.length} opportunities` : 'not connected' },
+  ghlcal: { ok: appts !== null, note: appts ? `${bookingCals.length} calendars` : 'calendars scope missing on the PIT' },
+  jn: { ok: jnJobs !== null, note: jnJobs ? `${jnJobs.length} jobs` : 'JOBNIMBUS_API_KEY missing' },
+  jnhook: (() => {
+    const at = syncState?.state.lastJnWebhookAt || 0;
+    return at ? { ok: Date.now() - at < 7 * 86400000, note: `last ping ${ago(at)}` } : { ok: null, note: 'waiting for the first ping since ping tracking went live; fires on the next job change in JobNimbus' };
+  })(),
+  artemis: { ok: artemis !== null, note: art ? `${art.count} projects, ${money(art.proposed)} proposed` : 'ARTEMIS_API_KEY missing' },
+  artemissync: { ok: artemis !== null && jnJobs !== null, note: artemis && jnJobs ? 'proposals mirror as leads; signatures go sold + Won + estimate' : 'needs Artemis + JobNimbus keys' },
+  callsync: (() => {
+    const at = syncState?.state.lastCallSyncAt || 0;
+    return calls === null ? { ok: false, note: 'needs CallRail keys' } : at ? { ok: true, note: `last poll ${ago(at)}` } : { ok: null, note: 'first poll runs on this load' };
+  })(),
+  ghlbridge: (() => {
+    const at = syncState?.state.lastGhlLeadSyncAt || 0;
+    if (jnJobs === null) return { ok: false, note: 'needs JobNimbus key' };
+    return at ? { ok: true, note: `polls GHL for Facebook/lead-ad leads; last ${ago(at)}` } : { ok: null, note: 'first poll runs on this load' };
+  })(),
+  artemishook: (() => {
+    const at = syncState?.state.lastArtemisWebhookAt || 0;
+    return at ? { ok: Date.now() - at < 30 * 86400000, note: `last ping ${ago(at)}` } : { ok: null, note: 'waiting for the first ping since ping tracking went live; fires on the next Artemis project event' };
+  })(),
+  callrail: { ok: calls !== null, note: calls ? `${calls.length} calls YTD` : 'CALLRAIL_API_KEY / ACCOUNT_ID missing' },
+  meta: { ok: platforms.facebook.pixelId.length > 0, note: platforms.facebook.pixelId ? `pixel ${platforms.facebook.pixelId}` : 'pixel id missing' },
+  gads: { ok: platforms.google.pixelId.length > 0, note: platforms.google.pixelId ? `${platforms.google.pixelId} (campaigns paused)` : 'tag missing' },
+  ga4: { ok: ga4Ids.length > 0, note: ga4Ids.length ? `${ga4Ids.join(' + ')}: page views, generate_lead, estimate funnel` : 'measurement id missing' },
+  discord: { ok: envv('DISCORD_WEBHOOK').length > 0, note: envv('DISCORD_WEBHOOK') ? 'webhook set' : 'DISCORD_WEBHOOK missing' },
+  web3forms: { ok: site.formAccessKey.length > 0, note: 'backup email on every form' },
+  hits: { ok: hits !== null, note: hits ? 'counting' : 'create an Upstash Redis store in Vercel Storage' },
+  indexnow: { ok: true, note: 'pings on every production deploy' },
+  cron: { ok: true, note: 'Mon 8am report, daily 9am JN sync' },
+  listings: { ok: true, note: 'GBP live; Bing Places synced from GBP' },
+};
+
+// ---- 360 pipeline: every person across every system ----
+const people360 = build360({
+  opps,
+  attrs,
+  pipelines,
+  calls,
+  appts: sumAppts,
+  jnJobs,
+  jnContacts,
+  revItems: jnRev?.items ?? [],
+  artemis,
+});
+const people360InRange = people360.filter((p) => p.lastActivity >= perfStart && (!perfEnd || p.lastActivity < perfEnd));
+const stages360 = stageSummary(people360InRange);
+const channels = channelSummary(people360InRange, spendSaved?.store.rows ?? [], sumRange);
+const chanTotals = channels.filter((c) => c.level === 0).reduce(
+  (t, c) => ({ spend: t.spend + c.spend, signedValue: t.signedValue + c.signedValue, paid: t.paid + c.paid, people: t.people + c.people, signed: t.signed + c.signed }),
+  { spend: 0, signedValue: 0, paid: 0, people: 0, signed: 0 },
+);
+const xFmt = (n: number | null) => (n == null ? '·' : `${n.toFixed(1)}x`);
+const ghlLoc = envv('GHL_LOCATION_ID');
+const ghlUrl = (id: string) => (ghlLoc ? `https://app.gohighlevel.com/v2/location/${ghlLoc}/contacts/detail/${id}` : '#');
+const jnUrl = (jnid: string) => `https://app.jobnimbus.com/job/${jnid}`;
+const stageLabel = (k: string) => STAGES.find((s) => s.key === k)?.label || k;
+const fmtPhone = (d: string) => (d.length === 10 ? `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}` : d);
+
+// Admin shell navigation: each entry is a client-side view (location.hash)
+// that shows/hides the matching data-view sections. One server render, no
+// extra requests when switching.
+const NAV = [
+  { v: 'overview', no: '00', label: 'Overview' },
+  { v: 'crm', no: '15', label: '360 Pipeline' },
+  { v: 'revenue', no: '12', label: 'Revenue summary' },
+  { v: 'month', no: '02', label: 'Month in review' },
+  { v: 'ledger', no: '05', label: 'KPI ledger' },
+  { v: 'spend', no: '06', label: 'Ad spend' },
+  { v: 'performance', no: '07', label: 'Performance' },
+  { v: 'pipeline', no: '08', label: 'Pipeline' },
+  { v: 'bookings', no: '09', label: 'Bookings' },
+  { v: 'production', no: '10', label: 'Production' },
+  { v: 'landing', no: '11', label: 'Landing pages' },
+  { v: 'proposals', no: '14', label: 'Proposals' },
+  { v: 'integrations', no: '13', label: 'Integrations' },
+];
+const spendRows = (spendSaved?.store.rows ?? []).slice(0, 36);
+const knownCampaigns = [...new Set(campaignRows.map((r) => r.name).filter((n) => !n.startsWith('(')))];
+
+// ---- Month in review (selector via ?month=YYYY-MM, defaults to current) ----
+const curYmNow = now.toISOString().slice(0, 7);
+const rawMonth = Astro.url.searchParams.get('month') || '';
+const selYm = /^\d{4}-(0[1-9]|1[0-2])$/.test(rawMonth) ? rawMonth : curYmNow;
+const selRow = monthly.find((m) => m.ym === selYm) ?? monthly[monthly.length - 1] ?? null;
+const selIdx = selRow ? monthly.findIndex((m) => m.ym === selRow.ym) : -1;
+const prevRow = selIdx > 0 ? monthly[selIdx - 1] : null;
+let selCampaigns: ReturnType<typeof buildCampaignTable> = [];
+let selSources: ReturnType<typeof buildSourceTable> = [];
+let selUpdates: ReturnType<typeof updatesBetween> = [];
+let selCallSources: ReturnType<typeof buildCallSources> = [];
+if (unlocked && selRow) {
+  const [yy, mm] = selRow.ym.split('-').map(Number);
+  const mStart = new Date(Date.UTC(yy, mm - 1, 1));
+  const mEnd = new Date(Date.UTC(yy, mm, 1));
+  selCampaigns = buildCampaignTable(opps, attrs, mStart, spendByCampaign(spendSaved?.store ?? null, mStart), mEnd);
+  selSources = buildSourceTable(opps, mStart, mEnd);
+  selUpdates = updatesBetween(mStart, mEnd, workLog);
+  selCallSources = buildCallSources(calls, mStart, mEnd);
+}
+const mdelta = (a: number | null, b: number | null | undefined) =>
+  a == null || b == null ? null : a - b;
+const monthTiles = selRow
+  ? [
+      { label: 'Form leads', v: selRow.leads, p: prevRow?.leads ?? null, money: false },
+      { label: 'Calls', v: selRow.calls, p: prevRow?.calls ?? null, money: false },
+      { label: 'Jobs won', v: selRow.jobsWon, p: prevRow?.jobsWon ?? null, money: false },
+      { label: 'Revenue won', v: selRow.revenue, p: prevRow?.revenue ?? null, money: true },
+      { label: 'Ad spend', v: selRow.spend, p: prevRow?.spend ?? null, money: true },
+      { label: 'CPL', v: selRow.cpl, p: prevRow?.cpl ?? null, money: true },
+      { label: 'CPA', v: selRow.cpa, p: prevRow?.cpa ?? null, money: true },
+      { label: 'ROI', v: selRow.roi, p: prevRow?.roi ?? null, money: false, isPct: true },
+    ]
+  : [];
+const curYm = now.toISOString().slice(0, 7);
+const monthOptions = Array.from({ length: 12 }, (_, i) => {
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+  return d.toISOString().slice(0, 7);
+});
+
+const thisWk = weekly[weekly.length - 1];
+const lastWk = weekly[weekly.length - 2];
+
+// Revenue won this week / last week
+const wkRevenue = (start?: Date, end?: Date) =>
+  !opps || !start || !end
+    ? 0
+    : opps
+        .filter((o) => o.status === 'won' && o.updatedAt >= start && o.updatedAt < end)
+        .reduce((s, o) => s + o.value, 0);
+const revThis = wkRevenue(thisWk?.start, thisWk?.end);
+const revLast = wkRevenue(lastWk?.start, lastWk?.end);
+
+const delta = (a: number | null | undefined, b: number | null | undefined) => {
+  if (a == null || b == null) return null;
+  return a - b;
+};
+
+const tiles = [
+  { label: 'Calls this week', value: thisWk?.calls ?? null, prev: lastWk?.calls ?? null, na: calls === null ? 'Connect CallRail' : null },
+  { label: 'Form leads this week', value: thisWk?.leads ?? null, prev: lastWk?.leads ?? null, na: opps === null ? 'Connect GHL' : null },
+  { label: 'Revenue won this week', value: revThis, prev: revLast, isMoney: true, na: opps === null ? 'Connect GHL' : null },
+];
+
+const wkUpdatesThis = thisWk ? updatesBetween(thisWk.start, thisWk.end, workLog) : [];
+const wkUpdatesLast = lastWk ? updatesBetween(lastWk.start, lastWk.end, workLog) : [];
+
+// ---- Chart geometry (server-built SVG; brand palette validated:
+//      navy #255188 leads, orange #f6871f calls) ----
+const CW = 800;
+const CH = 240;
+const PAD = { l: 36, r: 70, t: 12, b: 26 };
+const plotW = CW - PAD.l - PAD.r;
+const plotH = CH - PAD.t - PAD.b;
+const series = [
+  { key: 'leads', name: 'Form leads', color: '#255188', vals: weekly.map((w) => w.leads) },
+  ...(calls !== null
+    ? [{ key: 'calls', name: 'Calls', color: '#f6871f', vals: weekly.map((w) => w.calls ?? 0) }]
+    : []),
+];
+const maxVal = Math.max(4, ...series.flatMap((s) => s.vals));
+const niceMax = Math.ceil(maxVal / 4) * 4;
+const x = (i: number) => PAD.l + (weekly.length <= 1 ? 0 : (i * plotW) / (weekly.length - 1));
+const y = (v: number) => PAD.t + plotH - (v / niceMax) * plotH;
+const lineOf = (vals: number[]) => vals.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+const gridYs = [0, 0.25, 0.5, 0.75, 1].map((f) => ({ v: Math.round(niceMax * f), yy: y(niceMax * f) }));
+
+const sources = [
+  { name: 'GoHighLevel (leads, jobs, revenue)', ok: opps !== null },
+  { name: 'CallRail (calls)', ok: calls !== null },
+  { name: 'JobNimbus (production)', ok: jnJobs !== null },
+  { name: 'Artemis (proposals)', ok: artemis !== null },
+  { name: `Ad spend (${spendRows.length} entries)`, ok: spendRows.length + Object.keys(adSpend).length > 0 },
+];
+
+const fmtTile = (t: (typeof tiles)[0], v: number | null) =>
+  v == null ? '·' : t.isMoney ? money(v) : String(v);
+---
+
+<Layout
+  title="KPI Dashboard"
+  description="Private live KPI dashboard."
+  path="/dashboard/"
+  noindex={true}
+  noSwap={true}
+  bare={true}
+>
+  {!unlocked ? (
+    <section class="section">
+      <div class="container-x max-w-lg">
+        <div class="border border-navy-600/20 bg-white p-8 text-center">
+          <p class="kicker text-orange-700">Private dashboard</p>
+          <h1 class="h-section mt-2">Key required</h1>
+          <p class="mt-4 text-slate-600">
+            {keyConfigured
+              ? 'Open this page with the access key: /dashboard/?key=YOURKEY'
+              : 'Set a DASH_KEY environment variable in Vercel, then open /dashboard/?key=THATVALUE.'}
+          </p>
+        </div>
+      </div>
+    </section>
+  ) : (
+    <div class="lg:grid lg:grid-cols-[230px_minmax(0,1fr)]">
+      <style is:inline>
+        /* Server-side default: overview visible, other views hidden until the
+           switcher runs (also the no-JS fallback). */
+        [data-view]:not([data-view='overview']) { display: none; }
+        .dash-nav-link.nav-active { color: #fff; border-color: #f6871f; background: rgba(255,255,255,0.06); }
+      </style>
+
+      <!-- Admin nav: sidebar on desktop, scrollable tab bar on mobile -->
+      <aside class="sticky top-0 z-30 bg-navy-950 bg-blueprint grain text-white lg:h-screen lg:overflow-y-auto">
+        <div class="hidden items-center gap-2 px-5 pt-6 lg:flex">
+          <span class="sheet-no sheet-no-dark" aria-hidden="true">KPI</span>
+          <p class="kicker text-white">Admin</p>
+        </div>
+        <nav class="flex gap-1 overflow-x-auto px-3 py-2 lg:mt-4 lg:flex-col lg:px-3 lg:py-0 lg:pb-6" aria-label="Dashboard sections">
+          {NAV.map((n) => (
+            <a
+              href={`#${n.v}`}
+              data-nav={n.v}
+              class="dash-nav-link flex flex-shrink-0 items-center gap-2.5 border-l-2 border-transparent px-3 py-2 font-display text-sm font-bold uppercase tracking-wide text-navy-200 transition hover:text-white"
+            >
+              <span class="num text-xs text-navy-400">{n.no}</span>{n.label}
+            </a>
+          ))}
+        </nav>
+      </aside>
+
+      <div class="min-w-0">
+      <!-- Hero -->
+      <section data-view="overview" class="relative overflow-hidden bg-navy-950 bg-blueprint grain text-white">
+        <div class="container-x relative py-10 lg:py-12">
+          <div class="flex items-center gap-3">
+            <span class="sheet-no sheet-no-dark" aria-hidden="true">00</span>
+            <p class="kicker num text-white">Live KPI dashboard <span class="text-navy-200">·</span> Pulled {now.toISOString().slice(0, 16).replace('T', ' ')} UTC</p>
+            <span class="h-px flex-1 bg-white/20" aria-hidden="true"></span>
+          </div>
+          <h1 class="h-hero mt-5">How the company<br /><span class="text-orange-400">is actually doing</span></h1>
+          <div class="mt-5 flex flex-wrap gap-2">
+            {sources.map((s) => (
+              <span class:list={['spec-tag', !s.ok && 'bg-orange-700!']}>{s.ok ? '● ' : '○ '}{s.name}{!s.ok && ' · not connected'}</span>
+            ))}
+          </div>
+        </div>
+        <div class="rule-dim text-navy-200/40" aria-hidden="true"></div>
+      </section>
+
+      <!-- Week tiles -->
+      <section data-view="overview" class="section !py-12">
+        <div class="container-x">
+          <SectionHead no="01" kicker="This week vs last week" title="The weekly numbers" />
+          <div class="mt-8 grid gap-5 sm:grid-cols-3">
+            {tiles.map((t) => {
+              const d = t.na ? null : delta(t.value as number, t.prev as number);
+              return (
+                <div class="border border-navy-600/20 bg-white p-6">
+                  <p class="kicker text-navy-500">{t.label}</p>
+                  <p class="font-display num mt-2 text-5xl font-bold text-navy-800">
+                    {t.na ? '·' : fmtTile(t, t.value as number)}
+                  </p>
+                  <p class="num mt-2 text-sm text-slate-500">
+                    {t.na
+                      ? t.na
+                      : d == null
+                        ? ''
+                        : `${d >= 0 ? '+' : ''}${t.isMoney ? money(d).replace('$-', '-$') : d} vs last week (${fmtTile(t, t.prev as number)})`}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      <!-- Month in review -->
+      <section data-view="month" class="section !py-12 bg-navy-50 bg-blueprint-light">
+        <div class="container-x">
+          <div class="flex flex-wrap items-end justify-between gap-4">
+            <SectionHead no="02" kicker="Month in review" title={selRow ? `${selRow.label} ${selRow.ym.slice(0, 4)}` : 'Month in review'} class="grow" />
+            <form method="GET" action="/dashboard/" class="flex items-center gap-2">
+              <input type="hidden" name="key" value={urlKey} />
+              <label class="text-xs font-semibold uppercase tracking-wide text-navy-500" for="month-sel">Month</label>
+              <select id="month-sel" name="month" onchange="this.form.submit()" class="num rounded-none border border-navy-600/30 bg-white px-3 py-2 text-sm text-slate-800">
+                {monthly.map((m) => <option value={m.ym} selected={selRow && m.ym === selRow.ym}>{m.label} {m.ym.slice(0, 4)}</option>)}
+              </select>
+              <noscript><button type="submit" class="btn-outline !px-3 !py-1.5 text-xs">View</button></noscript>
+            </form>
+          </div>
+          <div class="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
+            {monthTiles.map((t) => {
+              const d = mdelta(t.v as number, t.p as number);
+              const fmtv = (x: number | null) => (x == null ? '·' : t.isPct ? pct(x) : t.money ? money(x) : String(x));
+              return (
+                <div class="border border-navy-600/20 bg-white p-5">
+                  <p class="kicker text-navy-500">{t.label}</p>
+                  <p class="font-display num mt-1.5 text-4xl font-bold text-navy-800">{fmtv(t.v as number)}</p>
+                  <p class="num mt-1.5 text-xs text-slate-500">
+                    {d == null || t.isPct ? (prevRow ? `prev: ${fmtv(t.p as number)}` : '') : `${d >= 0 ? '+' : ''}${t.money ? money(d).replace('$-', '-$') : Math.round(d * 100) / 100} vs ${prevRow?.label ?? 'prior'}`}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+          <div class="mt-6 grid gap-6 lg:grid-cols-3">
+            <div class="border border-navy-600/20 bg-white">
+              <p class="spec-tag">Top sources <span class="text-navy-200">·</span> {selRow?.label}</p>
+              <table class="num w-full text-right text-sm">
+                <tbody>
+                  {selSources.length === 0 && <tr><td class="p-4 text-left text-slate-500">No leads this month.</td></tr>}
+                  {selSources.slice(0, 6).map((r) => (
+                    <tr class="border-b border-navy-600/10 last:border-0">
+                      <td class="p-3 text-left font-semibold text-navy-800">{r.name}</td>
+                      <td class="p-3">{r.leads} leads</td>
+                      <td class="p-3">{r.won} won</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div class="border border-navy-600/20 bg-white">
+              <p class="spec-tag">Calls by source <span class="text-navy-200">·</span> {selRow?.label}</p>
+              <table class="num w-full text-right text-sm">
+                <tbody>
+                  {calls === null && <tr><td class="p-4 text-left text-slate-500">Connect CallRail (env vars) to see calls per number: Google Ads, Local Services, GBP, website.</td></tr>}
+                  {calls !== null && selCallSources.length === 0 && <tr><td class="p-4 text-left text-slate-500">No calls this month.</td></tr>}
+                  {selCallSources.slice(0, 8).map((r) => (
+                    <tr class="border-b border-navy-600/10 last:border-0">
+                      <td class="p-3 text-left font-semibold text-navy-800">{r.name}</td>
+                      <td class="p-3">{r.calls} calls</td>
+                      <td class="p-3">{r.firstTime} first-time</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div class="border border-navy-600/20 bg-white">
+              <p class="spec-tag">Top campaigns <span class="text-navy-200">·</span> {selRow?.label}</p>
+              <table class="num w-full text-right text-sm">
+                <tbody>
+                  {selCampaigns.length === 0 && <tr><td class="p-4 text-left text-slate-500">No campaign-attributed leads this month.</td></tr>}
+                  {selCampaigns.slice(0, 6).map((r) => (
+                    <tr class="border-b border-navy-600/10 last:border-0">
+                      <td class="p-3 text-left font-semibold text-navy-800">{r.name}</td>
+                      <td class="p-3">{r.leads} leads</td>
+                      <td class="p-3">{r.cpl != null ? money(r.cpl) + ' CPL' : '·'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div id="worklog" class="mt-6 scroll-mt-20 border border-navy-600/20 bg-white">
+            <p class="spec-tag">Work shipped <span class="text-navy-200">·</span> {selRow?.label} {selRow?.ym.slice(0, 4)} <span class="text-navy-200">·</span> {selUpdates.length} entries</p>
+            <form method="POST" action={`/api/log/?key=${encodeURIComponent(urlKey)}`} class="flex flex-wrap items-center gap-2 border-b border-navy-600/10 p-4">
+              <input type="date" name="date" value={now.toISOString().slice(0, 10)} class="num rounded-none border border-navy-600/30 px-2.5 py-2 text-sm text-slate-800" />
+              <input name="text" required placeholder="Log something done outside the code (e.g. Set up LSA profile)" class="min-w-64 flex-1 rounded-none border border-navy-600/30 px-3 py-2 text-sm text-slate-800" />
+              <button type="submit" class="btn-primary !px-4 !py-2 text-xs">Log it</button>
+            </form>
+            {selUpdates.length === 0 ? (
+              <p class="p-5 text-sm text-slate-500">Nothing logged for this month.</p>
+            ) : (
+              <ul class="grid gap-x-8 gap-y-2.5 p-5 lg:grid-cols-2">
+                {selUpdates.map((u) => (
+                  <li class="flex items-start gap-2.5 text-sm text-slate-700">
+                    <span class="num mt-0.5 flex-shrink-0 text-xs font-semibold text-navy-500">{u.date.slice(5)}</span>
+                    <span>{u.text}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <!-- Updates -->
+      <section data-view="overview" class="section !py-12">
+        <div class="container-x">
+          <SectionHead no="03" kicker="The work" title="Updates shipped" />
+          <div class="mt-8 grid gap-6 lg:grid-cols-2">
+            <div class="border border-navy-600/20 bg-white">
+              <p class="spec-tag">This week</p>
+              <ul class="space-y-2.5 p-5">
+                {wkUpdatesThis.length === 0 && <li class="text-sm text-slate-500">Nothing logged yet this week.</li>}
+                {wkUpdatesThis.map((u) => (
+                  <li class="flex items-start gap-2.5 text-sm text-slate-700">
+                    <span class="num mt-0.5 flex-shrink-0 text-xs font-semibold text-navy-500">{u.date.slice(5)}</span>
+                    <span>{u.text}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div class="border border-navy-600/20 bg-white">
+              <p class="spec-tag">Last week</p>
+              <ul class="space-y-2.5 p-5">
+                {wkUpdatesLast.length === 0 && <li class="text-sm text-slate-500">Nothing logged.</li>}
+                {wkUpdatesLast.map((u) => (
+                  <li class="flex items-start gap-2.5 text-sm text-slate-700">
+                    <span class="num mt-0.5 flex-shrink-0 text-xs font-semibold text-navy-500">{u.date.slice(5)}</span>
+                    <span>{u.text}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Trend chart -->
+      <section data-view="overview" class="section !py-12 bg-navy-50 bg-blueprint-light">
+        <div class="container-x">
+          <SectionHead no="04" kicker="Last 12 weeks" title="Lead flow trend" />
+          <div class="mt-6 flex flex-wrap items-center gap-4 text-sm">
+            {series.map((s) => (
+              <span class="inline-flex items-center gap-2 font-semibold text-navy-800">
+                <span class="h-0.5 w-6" style={`background:${s.color}`}></span>{s.name}
+              </span>
+            ))}
+            {calls === null && <span class="text-slate-500">Calls appear once CallRail is connected.</span>}
+          </div>
+          <div class="mt-4 overflow-x-auto border border-navy-600/20 bg-white p-4">
+            <svg viewBox={`0 0 ${CW} ${CH}`} class="h-auto w-full min-w-[40rem]" role="img" aria-label="Weekly form leads and calls, last 12 weeks">
+              {gridYs.map((g) => (
+                <>
+                  <line x1={PAD.l} x2={CW - PAD.r} y1={g.yy} y2={g.yy} stroke="#255188" stroke-opacity="0.12" stroke-width="1" />
+                  <text x={PAD.l - 8} y={g.yy + 4} text-anchor="end" font-size="11" fill="#64748b" style="font-variant-numeric: tabular-nums">{g.v}</text>
+                </>
+              ))}
+              {weekly.map((w, i) => (
+                (i % 2 === 0 || i === weekly.length - 1) && (
+                  <text x={x(i)} y={CH - 8} text-anchor="middle" font-size="11" fill="#64748b">{w.label}</text>
+                )
+              ))}
+              {series.map((s) => (
+                <>
+                  <polyline points={lineOf(s.vals)} fill="none" stroke={s.color} stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
+                  {s.vals.map((v, i) => (
+                    <circle cx={x(i)} cy={y(v)} r="3.5" fill={s.color} stroke="#fff" stroke-width="2">
+                      <title>{weekly[i].label}: {v} {s.name.toLowerCase()}</title>
+                    </circle>
+                  ))}
+                  <text x={CW - PAD.r + 8} y={y(s.vals[s.vals.length - 1] ?? 0) + 4} font-size="12" font-weight="600" fill={s.color}>{s.name}</text>
+                </>
+              ))}
+            </svg>
+          </div>
+        </div>
+      </section>
+
+      <!-- Monthly KPI table -->
+      <section data-view="ledger" class="section !py-12">
+        <div class="container-x">
+          <SectionHead no="05" kicker={`Year to date ${now.getUTCFullYear()}`} title="The KPI ledger" />
+          <div class="mt-8 overflow-x-auto border border-navy-600/20 bg-white">
+            <table class="num w-full min-w-[56rem] text-right text-sm">
+              <thead>
+                <tr class="border-b border-navy-600/20 text-xs font-semibold uppercase tracking-wide text-navy-500">
+                  <th class="p-3 text-left">KPI</th>
+                  {monthly.map((m) => <th class="p-3">{m.label}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="border-b border-navy-600/10">
+                  <td class="p-3 text-left font-semibold text-navy-800">Form leads</td>
+                  {monthly.map((m) => <td class="p-3">{opps === null ? '·' : m.leads}</td>)}
+                </tr>
+                <tr class="border-b border-navy-600/10">
+                  <td class="p-3 text-left font-semibold text-navy-800">Calls</td>
+                  {monthly.map((m) => <td class="p-3">{m.calls == null ? '·' : m.calls}</td>)}
+                </tr>
+                <tr class="border-b border-navy-600/10 bg-navy-50/60">
+                  <td class="p-3 text-left font-semibold text-navy-800">Ad spend</td>
+                  {monthly.map((m) => <td class="p-3">{m.spend ? money(m.spend) : '·'}</td>)}
+                </tr>
+                <tr class="border-b border-navy-600/10">
+                  <td class="p-3 text-left font-semibold text-navy-800">CPL (per lead)</td>
+                  {monthly.map((m) => <td class="p-3">{m.cpl == null ? '·' : money(m.cpl)}</td>)}
+                </tr>
+                <tr class="border-b border-navy-600/10">
+                  <td class="p-3 text-left font-semibold text-navy-800">Jobs won</td>
+                  {monthly.map((m) => <td class="p-3">{opps === null ? '·' : m.jobsWon}</td>)}
+                </tr>
+                <tr class="border-b border-navy-600/10">
+                  <td class="p-3 text-left font-semibold text-navy-800">CPA (per job)</td>
+                  {monthly.map((m) => <td class="p-3">{m.cpa == null ? '·' : money(m.cpa)}</td>)}
+                </tr>
+                <tr class="border-b border-navy-600/10 bg-navy-50/60">
+                  <td class="p-3 text-left font-semibold text-navy-800">Revenue won</td>
+                  {monthly.map((m) => <td class="p-3">{opps === null ? '·' : money(m.revenue)}</td>)}
+                </tr>
+                <tr>
+                  <td class="p-3 text-left font-semibold text-navy-800">ROI on ad spend</td>
+                  {monthly.map((m) => <td class:list={['p-3 font-semibold', m.roi != null && (m.roi >= 0 ? 'text-navy-700' : 'text-orange-700')]}>{m.roi == null ? '·' : pct(m.roi)}</td>)}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="mt-4 max-w-prose text-sm text-slate-600">
+            Leads and revenue come live from GoHighLevel (every form and ad lead creates an opportunity; put the job dollar amount on an opportunity and mark it Won for revenue to count). Calls come live from CallRail. Ad spend comes from the spend editor below. CPL divides spend by all leads (forms + calls). A dot means no data yet.
+          </p>
+        </div>
+      </section>
+
+      <!-- Spend editor -->
+      <section data-view="spend" class="section !py-12 scroll-mt-20 bg-navy-50 bg-blueprint-light">
+        <div class="container-x">
+          <SectionHead no="06" kicker="Manual input" title="Monthly ad spend" />
+          <div class="mt-8 grid gap-6 lg:grid-cols-2">
+            <form method="POST" action={`/api/spend/?key=${encodeURIComponent(urlKey)}`} class="border border-navy-600/20 bg-white p-6">
+              <p class="spec-tag spec-tag-ghost kicker text-navy-500">Add or correct a spend line</p>
+              <div class="mt-4 grid gap-4 sm:grid-cols-2">
+                <label class="block">
+                  <span class="text-xs font-semibold uppercase tracking-wide text-navy-500">Month</span>
+                  <select name="month" class="num mt-1 w-full rounded-none border border-navy-600/30 bg-white px-3 py-2.5 text-slate-800">
+                    {monthOptions.map((m) => <option value={m} selected={m === curYm}>{m}</option>)}
+                  </select>
+                </label>
+                <label class="block">
+                  <span class="text-xs font-semibold uppercase tracking-wide text-navy-500">Platform</span>
+                  <select name="platform" class="mt-1 w-full rounded-none border border-navy-600/30 bg-white px-3 py-2.5 text-slate-800">
+                    <option value="google">Google Ads (Search)</option>
+                    <option value="lsa">Google Local Services</option>
+                    <option value="facebook">Facebook / Meta</option>
+                    <option value="other">Other</option>
+                  </select>
+                </label>
+                <label class="block sm:col-span-2">
+                  <span class="text-xs font-semibold uppercase tracking-wide text-navy-500">Campaign (exactly as named in the ad platform)</span>
+                  <input name="campaign" list="known-campaigns" placeholder="Leave blank for platform total" class="mt-1 w-full rounded-none border border-navy-600/30 px-3 py-2.5 text-slate-800" />
+                  <datalist id="known-campaigns">{knownCampaigns.map((c) => <option value={c} />)}</datalist>
+                </label>
+                <label class="block">
+                  <span class="text-xs font-semibold uppercase tracking-wide text-navy-500">Ad set / ad group (optional)</span>
+                  <input name="adset" placeholder="Optional" class="mt-1 w-full rounded-none border border-navy-600/30 px-3 py-2.5 text-slate-800" />
+                </label>
+                <label class="block">
+                  <span class="text-xs font-semibold uppercase tracking-wide text-navy-500">Amount $</span>
+                  <input name="amount" inputmode="numeric" placeholder="0" class="num mt-1 w-full rounded-none border border-navy-600/30 px-3 py-2.5 text-slate-800" />
+                </label>
+              </div>
+              <button type="submit" class="btn-primary mt-5">Save line</button>
+              <p class="mt-3 text-xs text-slate-500">Same month + platform + campaign + ad set replaces that line. Matching campaign and ad set names join spend to the performance tables below for CPL, CPA, and ROI. Stored in GoHighLevel, survives every deploy.</p>
+            </form>
+            <div class="border border-navy-600/20 bg-white">
+              <p class="spec-tag">Spend lines <span class="text-navy-200">·</span> Newest first</p>
+              <table class="num w-full text-right text-sm">
+                <thead>
+                  <tr class="border-b border-navy-600/15 text-xs font-semibold uppercase tracking-wide text-navy-500">
+                    <th class="p-3 text-left">Month</th><th class="p-3 text-left">Platform</th><th class="p-3 text-left">Campaign · Ad set</th><th class="p-3">Amount</th><th class="p-3"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {spendRows.length === 0 && (
+                    <tr><td colspan="5" class="p-4 text-left text-slate-500">Nothing saved yet. First line creates the storage automatically.</td></tr>
+                  )}
+                  {spendRows.map((r) => (
+                    <tr class="border-b border-navy-600/10 last:border-0">
+                      <td class="p-3 text-left font-semibold text-navy-800">{r.month}</td>
+                      <td class="p-3 text-left capitalize text-slate-700">{r.platform}</td>
+                      <td class="p-3 text-left text-slate-700">{r.campaign || '(platform total)'}{r.adset && <span class="text-slate-400"> · {r.adset}</span>}</td>
+                      <td class="p-3 font-semibold">{money(r.amount)}</td>
+                      <td class="p-2">
+                        <form method="POST" action={`/api/spend/?key=${encodeURIComponent(urlKey)}`}>
+                          <input type="hidden" name="action" value="delete" />
+                          <input type="hidden" name="month" value={r.month} />
+                          <input type="hidden" name="platform" value={r.platform} />
+                          <input type="hidden" name="campaign" value={r.campaign} />
+                          <input type="hidden" name="adset" value={r.adset} />
+                          <button type="submit" class="text-xs font-semibold uppercase tracking-wide text-orange-700 hover:underline" aria-label={`Delete ${r.month} ${r.platform} ${r.campaign}`}>Remove</button>
+                        </form>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Source + campaign performance -->
+      <section data-view="performance" class="section !py-12">
+        <div class="container-x">
+          <div class="flex flex-wrap items-end justify-between gap-4">
+            <SectionHead no="07" kicker={rangeLabel} title="What is actually producing" class="grow" />
+            <form method="GET" action="/dashboard/" class="flex items-center gap-2">
+              <input type="hidden" name="key" value={urlKey} />
+              {selRow && <input type="hidden" name="month" value={selRow.ym} />}
+              <label class="text-xs font-semibold uppercase tracking-wide text-navy-500" for="range-sel">Range</label>
+              <select id="range-sel" name="range" onchange="this.form.submit()" class="rounded-none border border-navy-600/30 bg-white px-3 py-2 text-sm text-slate-800">
+                {Object.entries(RANGES).map(([k, r]) => <option value={k} selected={k === rangeKey}>{r.label}</option>)}
+              </select>
+              <noscript><button type="submit" class="btn-outline !px-3 !py-1.5 text-xs">View</button></noscript>
+            </form>
+          </div>
+          <div class="mt-8 grid gap-6 lg:grid-cols-2">
+            <div class="border border-navy-600/20 bg-white">
+              <p class="spec-tag">By lead source</p>
+              <table class="num w-full text-right text-sm">
+                <thead>
+                  <tr class="border-b border-navy-600/15 text-xs font-semibold uppercase tracking-wide text-navy-500">
+                    <th class="p-3 text-left">Source</th><th class="p-3">Leads</th><th class="p-3">Won</th><th class="p-3">Win %</th><th class="p-3">Revenue</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sourceRows.length === 0 && <tr><td colspan="5" class="p-4 text-left text-slate-500">No lead data yet.</td></tr>}
+                  {sourceRows.slice(0, 12).map((r) => (
+                    <tr class="border-b border-navy-600/10 last:border-0">
+                      <td class="p-3 text-left font-semibold text-navy-800">{r.name}</td>
+                      <td class="p-3">{r.leads}</td>
+                      <td class="p-3">{r.won}</td>
+                      <td class="p-3">{r.leads ? Math.round((r.won / r.leads) * 100) + '%' : '·'}</td>
+                      <td class="p-3">{r.revenue ? money(r.revenue) : '·'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div class="border border-navy-600/20 bg-white lg:col-span-2">
+              <p class="spec-tag">By UTM campaign <span class="text-navy-200">·</span> First touch <span class="text-navy-200">·</span> Spend joins by matching name</p>
+              <div class="overflow-x-auto">
+                <table class="num w-full min-w-[52rem] text-right text-sm">
+                  <thead>
+                    <tr class="border-b border-navy-600/15 text-xs font-semibold uppercase tracking-wide text-navy-500">
+                      <th class="p-3 text-left">Campaign</th><th class="p-3">Leads</th><th class="p-3">Won</th><th class="p-3">Revenue</th><th class="p-3">Spend</th><th class="p-3">CPL</th><th class="p-3">CPA</th><th class="p-3">ROI</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {campaignRows.length === 0 && <tr><td colspan="8" class="p-4 text-left text-slate-500">{attrs === null ? 'Contact attribution unavailable.' : 'No campaign-attributed leads yet.'}</td></tr>}
+                    {campaignRows.slice(0, 14).map((r) => (
+                      <tr class="border-b border-navy-600/10 last:border-0">
+                        <td class="p-3 text-left">
+                          <span class="font-semibold text-navy-800">{r.name}</span>
+                          {r.sub && <span class="ml-2 text-xs uppercase tracking-wide text-slate-400">{r.sub}</span>}
+                        </td>
+                        <td class="p-3">{r.leads}</td>
+                        <td class="p-3">{r.won}</td>
+                        <td class="p-3">{r.revenue ? money(r.revenue) : '·'}</td>
+                        <td class="p-3">{r.spend != null ? money(r.spend) : '·'}</td>
+                        <td class="p-3">{r.cpl != null ? money(r.cpl) : '·'}</td>
+                        <td class="p-3">{r.cpa != null ? money(r.cpa) : '·'}</td>
+                        <td class:list={['p-3 font-semibold', r.roi != null && (r.roi >= 0 ? 'text-navy-700' : 'text-orange-700')]}>{r.roi != null ? pct(r.roi) : '·'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div class="border border-navy-600/20 bg-white lg:col-span-2">
+              <p class="spec-tag">By ad set / ad group <span class="text-navy-200">·</span> First touch</p>
+              <div class="overflow-x-auto">
+                <table class="num w-full min-w-[52rem] text-right text-sm">
+                  <thead>
+                    <tr class="border-b border-navy-600/15 text-xs font-semibold uppercase tracking-wide text-navy-500">
+                      <th class="p-3 text-left">Campaign · Ad set</th><th class="p-3">Leads</th><th class="p-3">Won</th><th class="p-3">Revenue</th><th class="p-3">Spend</th><th class="p-3">CPL</th><th class="p-3">CPA</th><th class="p-3">ROI</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {adsetRows.length === 0 && <tr><td colspan="8" class="p-4 text-left text-slate-500">No ad-set-attributed leads yet. Ad set names arrive via utm_content (or Meta's ad set field).</td></tr>}
+                    {adsetRows.slice(0, 14).map((r) => (
+                      <tr class="border-b border-navy-600/10 last:border-0">
+                        <td class="p-3 text-left font-semibold text-navy-800">{r.name}</td>
+                        <td class="p-3">{r.leads}</td>
+                        <td class="p-3">{r.won}</td>
+                        <td class="p-3">{r.revenue ? money(r.revenue) : '·'}</td>
+                        <td class="p-3">{r.spend != null ? money(r.spend) : '·'}</td>
+                        <td class="p-3">{r.cpl != null ? money(r.cpl) : '·'}</td>
+                        <td class="p-3">{r.cpa != null ? money(r.cpa) : '·'}</td>
+                        <td class:list={['p-3 font-semibold', r.roi != null && (r.roi >= 0 ? 'text-navy-700' : 'text-orange-700')]}>{r.roi != null ? pct(r.roi) : '·'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <p class="mt-4 max-w-prose text-sm text-slate-600">
+            Sources come from the lead_source stamped on every opportunity. Campaigns come from first-touch UTM attribution on the contact, so Google and Facebook campaign names appear exactly as named in the ad platforms. Win rate and revenue only count opportunities marked Won with a dollar amount.
+          </p>
+        </div>
+      </section>
+
+      <!-- Pipeline health -->
+      <section data-view="pipeline" class="section !py-12 bg-navy-50 bg-blueprint-light">
+        <div class="container-x">
+          <SectionHead no="08" kicker={rangeLabel} title="Pipeline health" />
+          {funnel && (
+            <div class="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-6">
+              <div class="border border-navy-600/20 bg-white p-5">
+                <p class="kicker text-navy-500">Open leads</p>
+                <p class="font-display num mt-1.5 text-4xl font-bold text-navy-800">{funnel.open}</p>
+                <p class="num mt-1 text-xs text-slate-500">{funnel.openValue ? money(funnel.openValue) + ' in play' : 'no $ values set'}</p>
+              </div>
+              <div class:list={['border p-5', funnel.staleOpen > 0 ? 'border-orange-500 bg-orange-50' : 'border-navy-600/20 bg-white']}>
+                <p class:list={['kicker', funnel.staleOpen > 0 ? 'text-orange-700' : 'text-navy-500']}>Stale 7+ days</p>
+                <p class:list={['font-display num mt-1.5 text-4xl font-bold', funnel.staleOpen > 0 ? 'text-orange-700' : 'text-navy-800']}>{funnel.staleOpen}</p>
+                <p class="num mt-1 text-xs text-slate-500">open, untouched</p>
+              </div>
+              <div class="border border-navy-600/20 bg-white p-5">
+                <p class="kicker text-navy-500">Won</p>
+                <p class="font-display num mt-1.5 text-4xl font-bold text-navy-800">{funnel.won}</p>
+              </div>
+              <div class="border border-navy-600/20 bg-white p-5">
+                <p class="kicker text-navy-500">Lost</p>
+                <p class="font-display num mt-1.5 text-4xl font-bold text-navy-800">{funnel.lost}</p>
+              </div>
+              <div class="border border-navy-600/20 bg-white p-5">
+                <p class="kicker text-navy-500">Win rate</p>
+                <p class="font-display num mt-1.5 text-4xl font-bold text-navy-800">{funnel.winRate == null ? '·' : Math.round(funnel.winRate * 100) + '%'}</p>
+                <p class="num mt-1 text-xs text-slate-500">of decided leads</p>
+              </div>
+              <div class="border border-navy-600/20 bg-white p-5">
+                <p class="kicker text-navy-500">Avg days to win</p>
+                <p class="font-display num mt-1.5 text-4xl font-bold text-navy-800">{funnel.avgDaysToWin == null ? '·' : Math.round(funnel.avgDaysToWin)}</p>
+              </div>
+            </div>
+          )}
+          <div class="mt-6 grid gap-6 lg:grid-cols-3">
+            <div class="border border-navy-600/20 bg-white lg:col-span-2">
+              <p class="spec-tag">By pipeline <span class="text-navy-200">·</span> Year to date</p>
+              <div class="overflow-x-auto">
+                <table class="num w-full min-w-[36rem] text-right text-sm">
+                  <thead>
+                    <tr class="border-b border-navy-600/15 text-xs font-semibold uppercase tracking-wide text-navy-500">
+                      <th class="p-3 text-left">Pipeline</th><th class="p-3">Open</th><th class="p-3">Open $</th><th class="p-3">Won</th><th class="p-3">Lost</th><th class="p-3">Win %</th><th class="p-3">Revenue</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pipelineRows.length === 0 && <tr><td colspan="7" class="p-4 text-left text-slate-500">No pipeline data.</td></tr>}
+                    {pipelineRows.map((r) => (
+                      <tr class="border-b border-navy-600/10 last:border-0">
+                        <td class="p-3 text-left font-semibold text-navy-800">{r.name}</td>
+                        <td class="p-3">{r.open}</td>
+                        <td class="p-3">{r.openValue ? money(r.openValue) : '·'}</td>
+                        <td class="p-3">{r.won}</td>
+                        <td class="p-3">{r.lost}</td>
+                        <td class="p-3">{r.winRate == null ? '·' : Math.round(r.winRate * 100) + '%'}</td>
+                        <td class="p-3">{r.revenue ? money(r.revenue) : '·'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div class="border border-navy-600/20 bg-white">
+              <p class="spec-tag">List health <span class="text-navy-200">·</span> Consent tags</p>
+              {listHealth ? (
+                <ul class="divide-y divide-navy-600/10">
+                  <li class="flex items-baseline justify-between p-4">
+                    <span class="text-sm font-semibold text-navy-800">SMS consent rate</span>
+                    <span class="num font-display text-2xl font-bold text-navy-700">{listHealth.smsRate == null ? '·' : Math.round(listHealth.smsRate * 100) + '%'}</span>
+                  </li>
+                  <li class="flex items-baseline justify-between p-4">
+                    <span class="text-sm font-semibold text-navy-800">Textable leads</span>
+                    <span class="num font-display text-2xl font-bold text-navy-700">{listHealth.smsYes}</span>
+                  </li>
+                  <li class="flex items-baseline justify-between p-4">
+                    <span class="text-sm font-semibold text-navy-800">Marketing opt-ins</span>
+                    <span class="num font-display text-2xl font-bold text-navy-700">{listHealth.marketingOptins}</span>
+                  </li>
+                </ul>
+              ) : (
+                <p class="p-4 text-sm text-slate-500">Needs GHL connection.</p>
+              )}
+              <p class="border-t border-navy-600/10 p-4 text-xs text-slate-500">Counted from consent tags on contacts; tags exist on leads captured since the checkbox consent shipped (Aug 2026).</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Booked inspections -->
+      <section data-view="bookings" class="section !py-12">
+        <div class="container-x">
+          <SectionHead no="09" kicker="Next 14 days" title="Booked inspections" />
+          <div class="mt-8 border border-navy-600/20 bg-white">
+            <p class="spec-tag">From the GHL booking calendars <span class="text-navy-200">·</span> Roofing + Windows</p>
+            {appts === null ? (
+              <p class="p-4 text-sm text-slate-500">
+                Not connected. The GHL API key needs the calendars read scope; bookings still show inside GoHighLevel itself.
+              </p>
+            ) : appts.length === 0 ? (
+              <p class="p-4 text-sm text-slate-500">No appointments booked in the next 14 days.</p>
+            ) : (
+              <div class="overflow-x-auto">
+                <table class="num w-full min-w-[32rem] text-left text-sm">
+                  <thead>
+                    <tr class="border-b border-navy-600/15 text-xs font-semibold uppercase tracking-wide text-navy-500">
+                      <th class="p-3">When</th><th class="p-3">Appointment</th><th class="p-3">Calendar</th><th class="p-3">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {appts.map((a) => (
+                      <tr class="border-b border-navy-600/10 last:border-0">
+                        <td class="whitespace-nowrap p-3 font-semibold text-navy-800">
+                          {a.start.toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' })}
+                        </td>
+                        <td class="p-3 text-slate-700">{a.title}</td>
+                        <td class="p-3 text-slate-700">{a.calendar}</td>
+                        <td class="p-3">
+                          <span class:list={['rounded-full px-2 py-0.5 text-xs font-semibold', a.status === 'cancelled' || a.status === 'noshow' ? 'bg-orange-100 text-orange-700' : 'bg-navy-50 text-navy-700']}>
+                            {a.status || 'booked'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <p class="border-t border-navy-600/10 p-4 text-xs text-slate-500">
+              Leads can self-book from the thank-you page after submitting a roofing or windows form. Times shown in Pacific.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- JobNimbus production -->
+      <section data-view="production" class="section !py-12 bg-navy-50 bg-blueprint-light">
+        <div class="container-x">
+          <SectionHead no="10" kicker="JobNimbus · where jobs actually live" title="Production board" />
+          {jnJobs === null ? (
+            <p class="mt-8 border border-navy-600/20 bg-white p-4 text-sm text-slate-500">
+              Not connected. Add JOBNIMBUS_API_KEY in Vercel and redeploy.
+            </p>
+          ) : (
+            <>
+              <div class="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-5">
+                <div class="border border-navy-600/20 bg-white p-5">
+                  <p class="kicker text-navy-500">Total jobs</p>
+                  <p class="font-display num mt-1.5 text-4xl font-bold text-navy-800">{jnJobs.length}</p>
+                </div>
+                <div class="border border-navy-600/20 bg-white p-5">
+                  <p class="kicker text-navy-500">Pipeline</p>
+                  <p class="font-display num mt-1.5 text-4xl font-bold text-navy-800">{jnStages.pipeline}</p>
+                  <p class="num mt-1 text-xs text-slate-500">lead to signature</p>
+                </div>
+                <div class="border border-navy-600/20 bg-white p-5">
+                  <p class="kicker text-navy-500">In production</p>
+                  <p class="font-display num mt-1.5 text-4xl font-bold text-navy-800">{jnStages.production}</p>
+                  <p class="num mt-1 text-xs text-slate-500">sold to install</p>
+                </div>
+                <div class="border border-navy-600/20 bg-white p-5">
+                  <p class="kicker text-navy-500">Completed</p>
+                  <p class="font-display num mt-1.5 text-4xl font-bold text-navy-800">{jnStages.done}</p>
+                </div>
+                <div class="border border-navy-600/20 bg-white p-5">
+                  <p class="kicker text-navy-500">Approved $</p>
+                  <p class="font-display num mt-1.5 text-4xl font-bold text-navy-800">{jnBooked ? money(jnBooked) : '·'}</p>
+                  <p class="num mt-1 text-xs text-slate-500">estimate/invoice totals set in JN</p>
+                </div>
+              </div>
+              <div class="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-3">
+                <div class="border border-navy-600/20 bg-white p-5">
+                  <p class="kicker text-navy-500">Signed $ this month</p>
+                  <p class="font-display num mt-1.5 text-3xl font-bold text-navy-800">{jnSignedMtd ? money(jnSignedMtd) : '·'}</p>
+                </div>
+                <div class="border border-navy-600/20 bg-white p-5">
+                  <p class="kicker text-navy-500">Signed $ YTD</p>
+                  <p class="font-display num mt-1.5 text-3xl font-bold text-navy-800">{jnSignedYtd ? money(jnSignedYtd) : '·'}</p>
+                  <p class="num mt-1 text-xs text-slate-500">signed estimates</p>
+                </div>
+                <div class="border border-navy-600/20 bg-white p-5">
+                  <p class="kicker text-navy-500">Collected $ YTD</p>
+                  <p class="font-display num mt-1.5 text-3xl font-bold text-navy-800">{jnPaidYtd ? money(jnPaidYtd) : '·'}</p>
+                  <p class="num mt-1 text-xs text-slate-500">invoices paid in full</p>
+                </div>
+              </div>
+
+              {jnStuck.length > 0 && (
+                <div class="mt-6 border border-orange-500 bg-orange-50">
+                  <p class="spec-tag !text-orange-700">Stuck in production <span class="text-orange-300">·</span> 14+ days untouched</p>
+                  <ul class="divide-y divide-orange-200">
+                    {jnStuck.map((j) => (
+                      <li class="flex items-baseline justify-between gap-3 p-3 text-sm">
+                        <span class="font-semibold text-navy-800">{j.name} <span class="font-normal text-slate-500">({j.type})</span></span>
+                        <span class="num whitespace-nowrap text-orange-700">{j.status} · {daysAgo(j.updated)}d</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {jnRevRows.length > 0 && (
+                <div class="mt-6 border border-navy-600/20 bg-white">
+                  <p class="spec-tag">Revenue by lead source <span class="text-navy-200">·</span> JobNimbus $ matched to marketing attribution</p>
+                  <div class="overflow-x-auto">
+                    <table class="num w-full min-w-[34rem] text-right text-sm">
+                      <thead>
+                        <tr class="border-b border-navy-600/15 text-xs font-semibold uppercase tracking-wide text-navy-500">
+                          <th class="p-3 text-left">Source</th><th class="p-3 text-left">Campaign</th><th class="p-3">Jobs</th><th class="p-3">Signed $</th><th class="p-3">Paid $</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {jnRevRows.map((r) => (
+                          <tr class="border-b border-navy-600/10 last:border-0">
+                            <td class="p-3 text-left font-semibold text-navy-800">{r.source}</td>
+                            <td class="p-3 text-left text-slate-700">{r.campaign || '·'}</td>
+                            <td class="p-3">{r.n}</td>
+                            <td class="p-3">{r.signed ? money(r.signed) : '·'}</td>
+                            <td class="p-3">{r.paid ? money(r.paid) : '·'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p class="border-t border-navy-600/10 p-4 text-xs text-slate-500">
+                    Matched by phone/email between JobNimbus and the marketing CRM. This is the closed loop: ad dollars in, signed jobs out.
+                  </p>
+                </div>
+              )}
+
+              <div class="mt-6 border border-navy-600/20 bg-white">
+                <p class="spec-tag">By status <span class="text-navy-200">·</span> All jobs</p>
+                <div class="overflow-x-auto">
+                  <table class="num w-full min-w-[30rem] text-right text-sm">
+                    <thead>
+                      <tr class="border-b border-navy-600/15 text-xs font-semibold uppercase tracking-wide text-navy-500">
+                        <th class="p-3 text-left">Status</th><th class="p-3">Jobs</th><th class="p-3">Windows</th><th class="p-3">Roofing</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {jnStatusRows.map(([status, r]) => (
+                        <tr class="border-b border-navy-600/10 last:border-0">
+                          <td class="p-3 text-left font-semibold text-navy-800">{status}</td>
+                          <td class="p-3">{r.n}</td>
+                          <td class="p-3">{r.windows || '·'}</td>
+                          <td class="p-3">{r.roofing || '·'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p class="border-t border-navy-600/10 p-4 text-xs text-slate-500">
+                  Read-only view of JobNimbus. The Approved $ tile only counts jobs where an estimate or invoice total is entered in JobNimbus, so it grows as the team fills those in.
+                </p>
+              </div>
+
+              {jnPhotos && jnPhotos.length > 0 && (
+                <div class="mt-6 border border-navy-600/20 bg-white">
+                  <p class="spec-tag">Recent job photos in JobNimbus <span class="text-navy-200">·</span> Marketing candidates</p>
+                  <ul class="divide-y divide-navy-600/10">
+                    {jnPhotos.map((f) => (
+                      <li class="flex items-baseline justify-between gap-3 p-3 text-sm">
+                        <span class="truncate font-semibold text-navy-800">{f.filename}</span>
+                        <span class="num whitespace-nowrap text-xs text-slate-500">{f.by} · {f.when.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p class="border-t border-navy-600/10 p-4 text-xs text-slate-500">
+                    New install photos uploaded by the crew. Pull the good ones (with the owner's sign-off) into the projects gallery, case-study posts, and GBP.
+                  </p>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </section>
+      <!-- 360 pipeline -->
+      <section data-view="crm" class="section !py-12">
+        <div class="container-x">
+          <div class="flex flex-wrap items-end justify-between gap-4">
+            <SectionHead no="15" kicker={`Every person, every system · active ${rangeLabel.toLowerCase()}`} title="360 pipeline" class="grow" />
+            <form method="GET" action="/dashboard/" class="flex items-center gap-2">
+              <input type="hidden" name="key" value={urlKey} />
+              <select name="range" aria-label="Range" class="rounded-none border border-navy-600/30 bg-white px-3 py-2 text-sm text-navy-800">
+                {Object.entries(RANGES).map(([k, r]) => <option value={k} selected={k === rangeKey}>{r.label}</option>)}
+              </select>
+              <button type="submit" class="btn-primary !py-2 !text-sm">Go</button>
+            </form>
+          </div>
+
+          <!-- Stage funnel -->
+          <div class="mt-8 grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-8">
+            {stages360.map((s, i) => (
+              <div class:list={['border p-4', i >= 4 ? 'border-green-600/40 bg-green-50' : 'border-navy-600/20 bg-white']}>
+                <p class="kicker num text-navy-500">0{i + 1}</p>
+                <p class="font-display mt-1 text-sm font-bold uppercase tracking-tight text-navy-800">{s.label}</p>
+                <p class="font-display num mt-1 text-3xl font-bold text-navy-800">{s.count}</p>
+                <p class="num text-xs text-slate-500">{s.value ? money(s.value) : '·'}</p>
+              </div>
+            ))}
+          </div>
+
+          <!-- Kanban: top cards per stage -->
+          <div class="mt-6 overflow-x-auto">
+            <div class="flex min-w-[112rem] gap-3">
+              {stages360.map((s) => (
+                <div class="w-56 flex-shrink-0 border border-navy-600/20 bg-navy-50">
+                  <p class="spec-tag">{s.label} <span class="text-navy-200">·</span> {s.count}</p>
+                  <div class="space-y-2 p-2">
+                    {s.people.slice(0, 8).map((p) => (
+                      <div class="border border-navy-600/15 bg-white p-2.5 text-xs">
+                        <p class="truncate font-semibold text-navy-800">{p.name}</p>
+                        <p class="truncate text-slate-500">{p.source || '·'}{p.city ? ` · ${p.city}` : ''}</p>
+                        <div class="mt-1 flex flex-wrap gap-1">
+                          {p.ghl && <span class="rounded-sm bg-navy-100 px-1 text-[10px] font-semibold text-navy-700">GHL</span>}
+                          {p.calls > 0 && <span class="rounded-sm bg-navy-100 px-1 text-[10px] font-semibold text-navy-700">{p.calls} call{p.calls > 1 ? 's' : ''}</span>}
+                          {p.appts.booked > 0 && <span class="rounded-sm bg-navy-100 px-1 text-[10px] font-semibold text-navy-700">booked</span>}
+                          {p.artemis && <span class="rounded-sm bg-orange-100 px-1 text-[10px] font-semibold text-orange-800">Artemis</span>}
+                          {p.jn && <span class="rounded-sm bg-green-100 px-1 text-[10px] font-semibold text-green-800">JN {p.jn.type}</span>}
+                        </div>
+                        {p.value > 0 && <p class="num mt-1 font-semibold text-navy-800">{money(p.value)}</p>}
+                      </div>
+                    ))}
+                    {s.people.length > 8 && <p class="p-1 text-center text-xs text-slate-500">+{s.people.length - 8} more in the table</p>}
+                    {s.people.length === 0 && <p class="p-2 text-center text-xs text-slate-400">·</p>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <!-- Channel economics -->
+          <div class="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-5">
+            <div class="border border-navy-600/20 bg-white p-5"><p class="kicker text-navy-500">People</p><p class="font-display num mt-1.5 text-3xl font-bold text-navy-800">{chanTotals.people}</p><p class="num mt-1 text-xs text-slate-500">forms + phone, all channels</p></div>
+            <div class="border border-navy-600/20 bg-white p-5"><p class="kicker text-navy-500">Spend</p><p class="font-display num mt-1.5 text-3xl font-bold text-navy-800">{chanTotals.spend ? money(chanTotals.spend) : '·'}</p><p class="num mt-1 text-xs text-slate-500">from the spend editor</p></div>
+            <div class="border border-green-600/40 bg-green-50 p-5"><p class="kicker text-green-800">Signed $</p><p class="font-display num mt-1.5 text-3xl font-bold text-green-900">{chanTotals.signedValue ? money(chanTotals.signedValue) : '·'}</p><p class="num mt-1 text-xs text-green-800">{chanTotals.signed} signed</p></div>
+            <div class="border border-navy-600/20 bg-white p-5"><p class="kicker text-navy-500">Blended ROAS</p><p class="font-display num mt-1.5 text-3xl font-bold text-navy-800">{chanTotals.spend ? xFmt(chanTotals.signedValue / chanTotals.spend) : '·'}</p><p class="num mt-1 text-xs text-slate-500">signed $ / spend</p></div>
+            <div class="border border-navy-600/20 bg-white p-5"><p class="kicker text-navy-500">Blended CPL</p><p class="font-display num mt-1.5 text-3xl font-bold text-navy-800">{chanTotals.spend && chanTotals.people ? money(chanTotals.spend / chanTotals.people) : '·'}</p><p class="num mt-1 text-xs text-slate-500">spend / people</p></div>
+          </div>
+          <div class="mt-4 border border-navy-600/20 bg-white">
+            <p class="spec-tag">Channels <span class="text-navy-200">·</span> Platform → campaign → ad set, with the money attached</p>
+            <div class="overflow-x-auto">
+              <table class="num w-full min-w-[80rem] text-right text-sm">
+                <thead>
+                  <tr class="border-b border-navy-600/15 text-xs font-semibold uppercase tracking-wide text-navy-500">
+                    <th class="p-3 text-left">Channel</th><th class="p-3">People</th><th class="p-3">Forms</th><th class="p-3">Phone</th><th class="p-3">Booked</th><th class="p-3">Proposals</th><th class="p-3">Signed</th><th class="p-3">Signed $</th><th class="p-3">Paid $</th><th class="p-3">Spend</th><th class="p-3">CPL</th><th class="p-3">CPA</th><th class="p-3">ROAS</th><th class="p-3">ROI</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {channels.length === 0 && <tr><td colspan="14" class="p-4 text-left text-slate-500">No people in this range.</td></tr>}
+                  {channels.map((c) => (
+                    <tr class:list={['border-b border-navy-600/10 last:border-0', c.level === 0 && 'bg-navy-50/60 font-semibold']}>
+                      <td class:list={['p-3 text-left', c.level === 1 && 'pl-8', c.level === 2 && 'pl-14 text-slate-600']}>{c.level === 2 ? '↳ ' : ''}{c.label}</td>
+                      <td class="p-3">{c.people}</td>
+                      <td class="p-3">{c.forms || '·'}</td>
+                      <td class="p-3">{c.phone || '·'}</td>
+                      <td class="p-3">{c.booked || '·'}</td>
+                      <td class="p-3">{c.proposals || '·'}</td>
+                      <td class="p-3">{c.signed || '·'}</td>
+                      <td class="p-3">{c.signedValue ? money(c.signedValue) : '·'}</td>
+                      <td class="p-3">{c.paid ? money(c.paid) : '·'}</td>
+                      <td class="p-3">{c.spend ? money(c.spend) : '·'}</td>
+                      <td class="p-3">{c.cpl == null ? '·' : money(c.cpl)}</td>
+                      <td class="p-3">{c.cpa == null ? '·' : money(c.cpa)}</td>
+                      <td class="p-3">{xFmt(c.roas)}</td>
+                      <td class:list={['p-3', c.roi != null && (c.roi >= 0 ? 'text-green-800' : 'text-red-700')]}>{c.roi == null ? '·' : `${c.roi >= 0 ? '+' : ''}${Math.round(c.roi * 100)}%`}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p class="border-t border-navy-600/10 p-4 text-xs text-slate-500">
+              Every person is attributed to their ORIGINAL source (first form fill or first call); later touches never overwrite it. Platform from the source string; campaign and ad set from first-touch UTMs (utm_campaign / utm_content, which Meta fills from campaign and ad set names) or CallRail's campaign fields. Spend joins by platform, then campaign name, then ad set name exactly as entered in the spend editor. Signed $ = signed contracts (Artemis, JobNimbus, or GHL Won); Paid $ = JobNimbus invoices paid in full. ROAS = signed $ / spend; ROI = (signed $ − spend) / spend.
+            </p>
+          </div>
+
+          <!-- Full table with search -->
+          <div class="mt-6 border border-navy-600/20 bg-white">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-navy-600/10 p-3">
+              <p class="spec-tag spec-tag-ghost kicker text-navy-500">Everyone <span class="text-navy-200">·</span> {people360InRange.length} people, newest activity first</p>
+              <input id="crm-search" type="search" placeholder="Search name, phone, source, stage, city" class="w-full max-w-sm rounded-none border border-navy-600/30 px-3 py-1.5 text-sm" />
+            </div>
+            <div class="overflow-x-auto">
+              <table id="crm-table" class="num w-full min-w-[80rem] text-left text-sm">
+                <thead>
+                  <tr class="border-b border-navy-600/15 text-xs font-semibold uppercase tracking-wide text-navy-500">
+                    <th class="p-3">Person</th><th class="p-3">Stage</th><th class="p-3">Source</th><th class="p-3">GHL</th><th class="p-3">Calls</th><th class="p-3">Inspection</th><th class="p-3">Artemis</th><th class="p-3">JobNimbus</th><th class="p-3 text-right">Value</th><th class="p-3">Last activity</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {people360InRange.slice(0, 400).map((p) => (
+                    <tr class:list={['border-b border-navy-600/10 align-top last:border-0', p.lost && 'opacity-60']} data-search={`${p.name} ${p.phone} ${p.email} ${p.source} ${p.campaign} ${stageLabel(p.stage)} ${p.city} ${p.jn?.status || ''} ${p.artemis?.status || ''}`.toLowerCase()}>
+                      <td class="p-3">
+                        <span class="block font-semibold text-navy-800">{p.name}</span>
+                        <span class="block text-xs text-slate-500">{p.phone ? fmtPhone(p.phone) : ''}{p.phone && p.email ? ' · ' : ''}{p.email}</span>
+                      </td>
+                      <td class="p-3"><span class:list={['whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold', p.lost ? 'bg-slate-200 text-slate-600' : ['signed', 'production', 'complete', 'paid'].includes(p.stage) ? 'bg-green-100 text-green-800' : 'bg-navy-50 text-navy-700']}>{p.lost ? 'Lost' : stageLabel(p.stage)}</span></td>
+                      <td class="p-3 text-xs text-slate-600">{p.source || '·'}{p.campaign ? <span class="block text-slate-400">{p.campaign}</span> : null}</td>
+                      <td class="p-3 text-xs">{p.ghl ? <a href={ghlUrl(p.ghl.contactId)} target="_blank" rel="noopener" class="text-navy-700 hover:underline">{p.ghl.stage}{p.ghl.status !== 'open' ? ` (${p.ghl.status})` : ''}</a> : '·'}</td>
+                      <td class="p-3 text-xs">{p.calls || '·'}</td>
+                      <td class="p-3 text-xs">{p.appts.booked ? `${p.appts.booked} booked${p.appts.cancelled ? `, ${p.appts.cancelled} canceled` : ''}${p.appts.next ? ` · next ${p.appts.next.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}` : p.appts.cancelled ? `${p.appts.cancelled} canceled` : '·'}</td>
+                      <td class="p-3 text-xs">{p.artemis ? <a href={p.artemis.url} target="_blank" rel="noopener" class="text-navy-700 hover:underline">{p.artemis.status}{p.artemis.price ? ` · ${money(p.artemis.price)}` : ''}</a> : '·'}</td>
+                      <td class="p-3 text-xs">{p.jn ? <a href={jnUrl(p.jn.jnid)} target="_blank" rel="noopener" class="text-navy-700 hover:underline">{p.jn.type} · {p.jn.status}</a> : '·'}</td>
+                      <td class="p-3 text-right font-semibold text-navy-800">{p.paid ? `${money(p.paid)} paid` : p.value ? money(p.value) : '·'}</td>
+                      <td class="p-3 whitespace-nowrap text-xs text-slate-500">{p.lastActivity.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p class="border-t border-navy-600/10 p-4 text-xs text-slate-500">
+              People are matched across systems by phone number, then email. Stage = the furthest step reached anywhere: GHL lead → inspection booked (calendar) → Artemis proposal → contract sent → signed (Artemis signed, GHL Won, or JobNimbus Sold) → JobNimbus production → complete → paid invoice. Value = best known dollar figure (paid, then signed, then proposal, then GHL). Showing up to 400 rows; search filters instantly.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Revenue summary -->
+      <section data-view="revenue" class="section !py-12">
+        <div class="container-x">
+          <div class="flex flex-wrap items-end justify-between gap-4">
+            <SectionHead no="12" kicker={`${rangeLabel} vs the ${summary.days} days before`} title="Revenue summary" class="grow" />
+            <form method="GET" action="/dashboard/" class="flex items-center gap-2">
+              <input type="hidden" name="key" value={urlKey} />
+              <select name="range" aria-label="Range" class="rounded-none border border-navy-600/30 bg-white px-3 py-2 text-sm text-navy-800">
+                {Object.entries(RANGES).map(([k, r]) => <option value={k} selected={k === rangeKey}>{r.label}</option>)}
+              </select>
+              <button type="submit" class="btn-primary !py-2 !text-sm">Go</button>
+            </form>
+          </div>
+
+          <!-- Top cards -->
+          <div class="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
+            {summary.cards.map((m) => (
+              <div class="border border-navy-600/20 bg-white p-5">
+                <p class="kicker text-navy-500">{m.label}</p>
+                <p class="font-display num mt-1.5 text-4xl font-bold text-navy-800">{fmtMetric(m)}</p>
+                <span class:list={['num mt-2 inline-block rounded-full px-2 py-0.5 text-xs font-semibold', deltaClass(m)]}>{deltaText(m)}</span>
+                {m.note && <p class="mt-1 text-xs text-slate-500">{m.note}</p>}
+              </div>
+            ))}
+          </div>
+
+          <div class="mt-6 grid gap-6 lg:grid-cols-12">
+            <!-- Left: effectiveness + efficiency -->
+            <div class="space-y-6 lg:col-span-3">
+              <div class="border border-navy-600/20 bg-white">
+                <p class="spec-tag">Effectiveness</p>
+                <ul class="divide-y divide-navy-600/10">
+                  {summary.effectiveness.map((m) => (
+                    <li class="p-4">
+                      <p class="kicker text-navy-500">{m.label}</p>
+                      <p class="font-display num mt-1 text-3xl font-bold text-navy-800">{fmtMetric(m)}</p>
+                      <span class:list={['num mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-semibold', deltaClass(m)]}>{deltaText(m)}</span>
+                      {m.note && <p class="mt-1 text-xs text-slate-500">{m.note}</p>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div class="border border-navy-600/20 bg-white">
+                <p class="spec-tag">Efficiency</p>
+                <ul class="divide-y divide-navy-600/10">
+                  {summary.efficiency.map((m) => (
+                    <li class="p-4">
+                      <p class="kicker text-navy-500">{m.label}</p>
+                      <p class="font-display num mt-1 text-3xl font-bold text-navy-800">{fmtMetric(m)}</p>
+                      <span class:list={['num mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-semibold', deltaClass(m)]}>{deltaText(m)}</span>
+                      {m.note && <p class="mt-1 text-xs text-slate-500">{m.note}</p>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            <!-- Right: pipeline + conversions -->
+            <div class="space-y-6 lg:col-span-9">
+              <div class="border border-navy-600/20 bg-white">
+                <p class="spec-tag">Revenue pipeline <span class="text-navy-200">·</span> JobNimbus estimates written, signed, and paid</p>
+                <div class="grid gap-6 p-5 lg:grid-cols-5">
+                  <div class="space-y-4 lg:col-span-3">
+                    {summary.pipeline.map((p) => (
+                      <div class="flex flex-wrap items-center justify-between gap-4 border border-dashed border-navy-600/25 p-4">
+                        <div>
+                          <p class="kicker text-navy-500">{p.label}</p>
+                          <p class="font-display num mt-1 text-3xl font-bold text-navy-800">{money(p.value)}</p>
+                          <span class:list={['num mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-semibold', p.delta == null ? 'bg-slate-200 text-slate-600' : p.delta >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-700']}>
+                            {p.delta == null ? 'no baseline' : `${p.delta >= 0 ? '↑' : '↓'} ${Math.abs(p.delta * 100).toFixed(0)}%`}
+                          </span>
+                        </div>
+                        <div>
+                          <p class="kicker text-navy-300">By day</p>
+                          <svg viewBox="0 0 220 60" width="220" height="60" class="mt-1" role="img" aria-label={`${p.label} cumulative by day, this period vs prior`}>
+                            <polyline points={sparkPoints(p.series.prev, sparkMax(p.series))} fill="none" stroke="#cbd5e1" stroke-width="2" />
+                            <polyline points={sparkPoints(p.series.cur, sparkMax(p.series))} fill="none" stroke="#255188" stroke-width="2.5" />
+                          </svg>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div class="lg:col-span-2">
+                    <p class="kicker text-navy-500">This period</p>
+                    <svg viewBox="0 0 320 170" class="mt-2 w-full" role="img" aria-label="Estimated, sold, and closed revenue">
+                      {summary.pipeline.map((p, i) => (
+                        <g>
+                          <text x="0" y={22 + i * 52} class="fill-slate-600" font-size="12" font-family="Barlow, sans-serif">{p.label.replace(' revenue', '')}</text>
+                          <rect x="78" y={8 + i * 52} width={Math.max(2, (p.value / pipeMax) * 236)} height="30" fill="#255188" />
+                          <text x={82 + Math.max(2, (p.value / pipeMax) * 236)} y={28 + i * 52} class="fill-navy-800" font-size="11" font-family="Barlow, sans-serif">{money(p.value)}</text>
+                        </g>
+                      ))}
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              <div class="border border-navy-600/20 bg-white">
+                <p class="spec-tag">Conversion tool performance <span class="text-navy-200">·</span> Where leads come from and what they are worth</p>
+                <div class="grid grid-cols-2 gap-4 p-5 sm:max-w-md">
+                  {[summary.conversions.total, summary.conversions.unique].map((m) => (
+                    <div>
+                      <p class="kicker text-navy-500">{m.label}</p>
+                      <p class="font-display num mt-1 text-3xl font-bold text-navy-800">{fmtMetric(m)}</p>
+                      <span class:list={['num mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-semibold', deltaClass(m)]}>{deltaText(m)}</span>
+                    </div>
+                  ))}
+                </div>
+                <div class="overflow-x-auto">
+                  <table class="num w-full min-w-[40rem] text-right text-sm">
+                    <thead>
+                      <tr class="border-b border-navy-600/15 text-xs font-semibold uppercase tracking-wide text-navy-500">
+                        <th class="p-3 text-left">Lead source</th><th class="p-3 text-left">Type</th><th class="p-3">Conversions</th><th class="p-3">Revenue potential</th><th class="p-3">Book rate</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {summary.conversions.rows.length === 0 && <tr><td colspan="5" class="p-4 text-left text-slate-500">No conversions in this range.</td></tr>}
+                      {summary.conversions.rows.map((r) => (
+                        <tr class="border-b border-navy-600/10 last:border-0">
+                          <td class="p-3 text-left font-semibold text-navy-800">{r.source}</td>
+                          <td class="p-3 text-left text-slate-600">{r.type}</td>
+                          <td class="p-3">{r.conversions}<span class="block text-xs text-slate-500">{rate(r.share)}</span></td>
+                          <td class:list={['p-3', r.potential ? 'bg-green-50 font-semibold text-green-900' : '']}>{r.potential ? money(r.potential) : '·'}</td>
+                          <td class="p-3">{r.bookRate == null ? '·' : rate(r.bookRate)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p class="border-t border-navy-600/10 p-4 text-xs text-slate-500">
+                  Forms = GHL opportunities by lead source; phone = CallRail calls by tracker. Revenue potential joins JobNimbus estimates to the lead by phone/email. Book rate = appointments booked by that source's contacts / its leads. Prior-period spend compares whole months, so short ranges inside one month show a flat spend delta.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Landing pages -->
+      <section data-view="landing" class="section !py-12">
+        <div class="container-x">
+          <div class="flex flex-wrap items-end justify-between gap-4">
+            <SectionHead no="11" kicker={rangeLabel} title="Landing pages" class="grow" />
+            <form method="GET" action="/dashboard/" class="flex items-center gap-2">
+              <input type="hidden" name="key" value={urlKey} />
+              <select name="range" aria-label="Range" class="rounded-none border border-navy-600/30 bg-white px-3 py-2 text-sm text-navy-800">
+                {Object.entries(RANGES).map(([k, r]) => <option value={k} selected={k === rangeKey}>{r.label}</option>)}
+              </select>
+              <button type="submit" class="btn-primary !py-2 !text-sm">Go</button>
+            </form>
+          </div>
+
+          <div class="mt-8 grid gap-4 lg:grid-cols-3">
+            {lpPlatforms.map((p) => (
+              <div class="border border-navy-600/20 bg-white p-5">
+                <p class="kicker text-orange-700">{p.name} Ads <span class="text-navy-300">·</span> {p.rows.length} pages</p>
+                <div class="num mt-3 grid grid-cols-2 gap-3 text-sm">
+                  <div><p class="kicker text-navy-500">Visits</p><p class="font-display text-3xl font-bold text-navy-800">{p.visits == null ? '·' : p.visits}</p></div>
+                  <div><p class="kicker text-navy-500">Form leads</p><p class="font-display text-3xl font-bold text-navy-800">{p.leads}</p></div>
+                  <div><p class="kicker text-navy-500">Calls</p><p class="font-display text-2xl font-bold text-navy-800">{p.calls == null ? '·' : p.calls}</p></div>
+                  <div><p class="kicker text-navy-500">Spend</p><p class="font-display text-2xl font-bold text-navy-800">{p.spend ? money(p.spend) : '·'}</p></div>
+                  <div><p class="kicker text-navy-500">CPL</p><p class="font-display text-2xl font-bold text-navy-800">{p.cpl == null ? '·' : money(p.cpl)}</p></div>
+                  <div><p class="kicker text-navy-500">Conv. rate</p><p class="font-display text-2xl font-bold text-navy-800">{p.visits ? rate(p.leads / p.visits) : '·'}</p></div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div class="mt-6 border border-navy-600/20 bg-white">
+            <p class="spec-tag">Per page <span class="text-navy-200">·</span> Visits, leads, and where those leads sit in the pipeline</p>
+            <div class="overflow-x-auto">
+              <table class="num w-full min-w-[60rem] text-right text-sm">
+                <thead>
+                  <tr class="border-b border-navy-600/15 text-xs font-semibold uppercase tracking-wide text-navy-500">
+                    <th class="p-3 text-left">Page</th><th class="p-3">Visits</th><th class="p-3">All-time</th><th class="p-3">Leads</th><th class="p-3">Conv.</th><th class="p-3">Won</th><th class="p-3">Value</th><th class="p-3 text-left">Pipeline stages</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lpRows.map((r) => (
+                    <tr class="border-b border-navy-600/10 last:border-0">
+                      <td class="p-3 text-left">
+                        <a href={r.path} target="_blank" rel="noopener" class="font-semibold text-navy-800 hover:underline">{r.label}</a>
+                        <span class="block text-xs text-slate-500">{platforms[r.platform].name} · {r.path}</span>
+                      </td>
+                      <td class="p-3">{r.visits == null ? '·' : r.visits}</td>
+                      <td class="p-3 text-slate-500">{r.allTime == null ? '·' : r.allTime}</td>
+                      <td class="p-3 font-semibold text-navy-800">{r.leads}</td>
+                      <td class="p-3">{r.conv == null ? '·' : rate(r.conv)}</td>
+                      <td class="p-3">{r.won || '·'}</td>
+                      <td class="p-3">{r.value ? money(r.value) : '·'}</td>
+                      <td class="p-3 text-left text-xs text-slate-600">{r.stages.length ? r.stages.map(([n, c]) => `${n} ${c}`).join(' · ') : '·'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p class="border-t border-navy-600/10 p-4 text-xs text-slate-500">
+              {hits === null
+                ? 'Visits not connected: in Vercel go to Storage, create an Upstash Redis store, connect it to this project, and redeploy. Leads and pipeline stages work without it.'
+                : 'Visits count real browser loads of each landing page (bots filtered). Leads are GHL opportunities tagged with that page\'s lead source, placed in the stage they currently sit in.'}
+            </p>
+          </div>
+
+          <div class="mt-6 grid gap-6 lg:grid-cols-2">
+            {lpRows.filter((r) => r.recent.length > 0).slice(0, 6).map((r) => (
+              <div class="border border-navy-600/20 bg-white">
+                <p class="spec-tag">{r.label} <span class="text-navy-200">·</span> Latest leads</p>
+                <ul class="divide-y divide-navy-600/10">
+                  {r.recent.map((o) => (
+                    <li class="flex items-baseline justify-between gap-3 p-3 text-sm">
+                      <span class="truncate font-semibold text-navy-800">{o.name || 'Lead'}</span>
+                      <span class="num whitespace-nowrap text-xs text-slate-500">
+                        {o.createdAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · {o.status === 'open' ? stageInfo.get(o.pipelineStageId)?.name || 'Open' : o.status}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+      <!-- Proposals (Artemis) -->
+      <section data-view="proposals" class="section !py-12">
+        <div class="container-x">
+          <div class="flex flex-wrap items-end justify-between gap-4">
+            <SectionHead no="14" kicker={`Artemis · projects created ${rangeLabel.toLowerCase()}`} title="Proposals" class="grow" />
+            <form method="GET" action="/dashboard/" class="flex items-center gap-2">
+              <input type="hidden" name="key" value={urlKey} />
+              <select name="range" aria-label="Range" class="rounded-none border border-navy-600/30 bg-white px-3 py-2 text-sm text-navy-800">
+                {Object.entries(RANGES).map(([k, r]) => <option value={k} selected={k === rangeKey}>{r.label}</option>)}
+              </select>
+              <button type="submit" class="btn-primary !py-2 !text-sm">Go</button>
+            </form>
+          </div>
+
+          {!artAn ? (
+            <p class="mt-8 border border-navy-600/20 bg-white p-4 text-sm text-slate-500">Not connected. Add ARTEMIS_API_KEY in Vercel and redeploy.</p>
+          ) : (
+            <>
+              <div class="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-6">
+                <div class="border border-navy-600/20 bg-white p-5"><p class="kicker text-navy-500">Projects</p><p class="font-display num mt-1.5 text-4xl font-bold text-navy-800">{artAn.inRange}</p><p class="num mt-1 text-xs text-slate-500">of {artAn.total} all-time</p></div>
+                <div class="border border-navy-600/20 bg-white p-5"><p class="kicker text-navy-500">Proposed $</p><p class="font-display num mt-1.5 text-3xl font-bold text-navy-800">{artAn.proposed ? money(artAn.proposed) : '·'}</p></div>
+                <div class="border border-navy-600/20 bg-white p-5"><p class="kicker text-navy-500">Contracts out</p><p class="font-display num mt-1.5 text-3xl font-bold text-navy-800">{artAn.contractsOut ? money(artAn.contractsOut) : '·'}</p></div>
+                <div class="border border-green-600/40 bg-green-50 p-5"><p class="kicker text-green-800">Signed $</p><p class="font-display num mt-1.5 text-3xl font-bold text-green-900">{artAn.signed ? money(artAn.signed) : '·'}</p><p class="num mt-1 text-xs text-green-800">{artAn.signedCount} contract{artAn.signedCount === 1 ? '' : 's'}</p></div>
+                <div class="border border-navy-600/20 bg-white p-5"><p class="kicker text-navy-500">Close rate</p><p class="font-display num mt-1.5 text-3xl font-bold text-navy-800">{artAn.closeRate == null ? '·' : rate(artAn.closeRate)}</p><p class="num mt-1 text-xs text-slate-500">signed / created</p></div>
+                <div class="border border-navy-600/20 bg-white p-5"><p class="kicker text-navy-500">Avg proposal</p><p class="font-display num mt-1.5 text-3xl font-bold text-navy-800">{artAn.avgProposal ? money(artAn.avgProposal) : '·'}</p><p class="num mt-1 text-xs text-slate-500">{artAn.avgDaysToSign == null ? '' : `${Math.round(artAn.avgDaysToSign)} days to sign`}</p></div>
+              </div>
+
+              <div class="mt-6 grid gap-6 lg:grid-cols-12">
+                <div class="border border-navy-600/20 bg-white lg:col-span-5">
+                  <p class="spec-tag">Funnel <span class="text-navy-200">·</span> Projects at or past each stage</p>
+                  <ul class="p-5">
+                    {artAn.funnel.map((f) => (
+                      <li class="mb-3">
+                        <div class="num flex items-baseline justify-between text-sm"><span class="font-semibold text-navy-800">{f.stage}</span><span class="text-slate-600">{f.count}</span></div>
+                        <div class="mt-1 h-3 w-full bg-navy-50"><div class="h-3 bg-navy-700" style={`width:${artAn.funnel[0].count ? Math.max(1, (f.count / artAn.funnel[0].count) * 100) : 0}%`}></div></div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div class="border border-navy-600/20 bg-white lg:col-span-7">
+                  <p class="spec-tag">Last 6 months <span class="text-navy-200">·</span> Created vs signed</p>
+                  <div class="p-5">
+                    <svg viewBox="0 0 520 160" class="w-full" role="img" aria-label="Projects created and contracts signed per month">
+                      {artAn.monthly.map((m, i) => {
+                        const x = 20 + i * 82;
+                        const hc = (m.created / artMax) * 110;
+                        const hs = (m.signed / artMax) * 110;
+                        return (
+                          <g>
+                            <rect x={x} y={125 - hc} width="28" height={hc} fill="#a9c0e3" />
+                            <rect x={x + 32} y={125 - hs} width="28" height={hs} fill="#255188" />
+                            <text x={x + 30} y="142" text-anchor="middle" font-size="11" fill="#475569" font-family="Barlow, sans-serif">{m.ym.slice(5)}/{m.ym.slice(2, 4)}</text>
+                            <text x={x + 14} y={121 - hc} text-anchor="middle" font-size="10" fill="#475569" font-family="Barlow, sans-serif">{m.created || ''}</text>
+                            <text x={x + 46} y={121 - hs} text-anchor="middle" font-size="10" fill="#255188" font-family="Barlow, sans-serif">{m.signed || ''}</text>
+                          </g>
+                        );
+                      })}
+                      <rect x="20" y="150" width="10" height="8" fill="#a9c0e3" /><text x="34" y="158" font-size="10" fill="#475569" font-family="Barlow, sans-serif">created</text>
+                      <rect x="90" y="150" width="10" height="8" fill="#255188" /><text x="104" y="158" font-size="10" fill="#475569" font-family="Barlow, sans-serif">signed</text>
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mt-6 grid gap-6 lg:grid-cols-4">
+                {[
+                  { title: 'By status', rows: artAn.byStatus.map((r) => [r.status, `${r.n}${r.value ? ' · ' + money(r.value) : ''}`]) },
+                  { title: 'By scope', rows: artAn.byCategory.map((r) => [r.category, `${r.n}${r.value ? ' · ' + money(r.value) : ''}`]) },
+                  { title: 'By rep', rows: artAn.byRep.map((r) => [r.rep, `${r.n} · ${r.signed} signed${r.value ? ' · ' + money(r.value) : ''}`]) },
+                  { title: 'Financing', rows: artAn.financing.map((r) => [r.label, String(r.n)]) },
+                ].map((box) => (
+                  <div class="border border-navy-600/20 bg-white">
+                    <p class="spec-tag">{box.title}</p>
+                    <ul class="num divide-y divide-navy-600/10 text-sm">
+                      {box.rows.length === 0 && <li class="p-3 text-slate-500">·</li>}
+                      {box.rows.slice(0, 8).map(([k, v]) => (
+                        <li class="flex items-baseline justify-between gap-3 p-3"><span class="truncate font-semibold text-navy-800">{k}</span><span class="whitespace-nowrap text-slate-600">{v}</span></li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+
+              <div class="mt-6 border border-navy-600/20 bg-white">
+                <p class="spec-tag">Recently updated <span class="text-navy-200">·</span> Click through to the proposal</p>
+                <div class="overflow-x-auto">
+                  <table class="num w-full min-w-[52rem] text-left text-sm">
+                    <thead><tr class="border-b border-navy-600/15 text-xs font-semibold uppercase tracking-wide text-navy-500"><th class="p-3">Homeowner</th><th class="p-3">City</th><th class="p-3">Status</th><th class="p-3 text-right">Proposal</th><th class="p-3">Scope</th><th class="p-3">Rep</th><th class="p-3">Updated</th></tr></thead>
+                    <tbody>
+                      {artAn.recent.map((p) => (
+                        <tr class="border-b border-navy-600/10 last:border-0">
+                          <td class="p-3"><a href={p.proposalUrl} target="_blank" rel="noopener" class="font-semibold text-navy-800 hover:underline">{p.homeowner.name || p.name}</a></td>
+                          <td class="p-3 text-slate-600">{p.city || '·'}</td>
+                          <td class="p-3"><span class:list={['rounded-full px-2 py-0.5 text-xs font-semibold', /signed/i.test(p.status) ? 'bg-green-100 text-green-800' : /contract/i.test(p.status) ? 'bg-orange-100 text-orange-800' : 'bg-navy-50 text-navy-700']}>{p.status}</span></td>
+                          <td class="p-3 text-right">{p.price ? money(p.price) : '·'}</td>
+                          <td class="p-3 text-slate-600">{p.categories.join(', ') || '·'}</td>
+                          <td class="p-3 text-slate-600">{p.rep || '·'}</td>
+                          <td class="p-3 whitespace-nowrap text-slate-500">{p.updatedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p class="border-t border-navy-600/10 p-4 text-xs text-slate-500">
+                  {artAn.detailed} of {artAn.total} projects have full detail loaded (price, rep, scope); the rest fill in automatically as the cache warms (40 per load, plus the daily sync). Signed contracts write the proposal value onto the GHL opportunity and move the JobNimbus job to Sold.
+                </p>
+              </div>
+            </>
+          )}
+        </div>
+      </section>
+
+      <!-- Integrations -->
+      <section data-view="integrations" class="section !py-12 bg-navy-50 bg-blueprint-light">
+        <div class="container-x">
+          <SectionHead no="13" kicker="What talks to what" title="Integrations" />
+
+          <div class="mt-8 border border-navy-600/20 bg-white">
+            <p class="spec-tag">Connected <span class="text-navy-200">·</span> Live status checked on this page load</p>
+            <div class="overflow-x-auto">
+              <table class="w-full min-w-[56rem] text-left text-sm">
+                <thead>
+                  <tr class="border-b border-navy-600/15 text-xs font-semibold uppercase tracking-wide text-navy-500">
+                    <th class="p-3">System</th><th class="p-3">Status</th><th class="p-3">What it does</th><th class="p-3">Feeds</th><th class="p-3">Credential</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {connectedIntegrations.map((c) => {
+                    const st = integrationStatus[c.key] || { ok: null, note: '' };
+                    return (
+                      <tr class="border-b border-navy-600/10 align-top last:border-0">
+                        <td class="p-3 font-semibold text-navy-800">{c.name}</td>
+                        <td class="p-3">
+                          <span class:list={['inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold', st.ok === true ? 'bg-green-100 text-green-800' : st.ok === false ? 'bg-red-100 text-red-700' : 'bg-slate-200 text-slate-700']}>
+                            {st.ok === true ? '● connected' : st.ok === false ? '○ not connected' : '◐ waiting'}
+                          </span>
+                          <span class="num mt-1 block text-xs text-slate-500">{st.note}</span>
+                        </td>
+                        <td class="p-3 text-slate-700">{c.role}</td>
+                        <td class="p-3 text-xs text-slate-600">{c.feeds}</td>
+                        <td class="p-3 font-mono text-xs text-slate-500">{c.setup}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {art && (
+            <div class="mt-6 border border-navy-600/20 bg-white">
+              <p class="spec-tag">Artemis proposals <span class="text-navy-200">·</span> All projects</p>
+              <div class="grid grid-cols-2 gap-4 p-5 lg:grid-cols-4">
+                <div><p class="kicker text-navy-500">Projects</p><p class="font-display num mt-1 text-3xl font-bold text-navy-800">{art.count}</p></div>
+                <div><p class="kicker text-navy-500">Proposed $</p><p class="font-display num mt-1 text-3xl font-bold text-navy-800">{art.proposed ? money(art.proposed) : '·'}</p></div>
+                <div><p class="kicker text-navy-500">Contracts out</p><p class="font-display num mt-1 text-3xl font-bold text-navy-800">{art.sent ? money(art.sent) : '·'}</p></div>
+                <div><p class="kicker text-navy-500">Signed $</p><p class="font-display num mt-1 text-3xl font-bold text-navy-800">{art.signed ? money(art.signed) : '·'}</p></div>
+              </div>
+              <div class="grid gap-6 border-t border-navy-600/10 p-5 lg:grid-cols-2">
+                <div>
+                  <p class="kicker text-navy-500">By status</p>
+                  <ul class="num mt-2 divide-y divide-navy-600/10 text-sm">
+                    {art.byStatus.map(([s, r]) => (
+                      <li class="flex items-baseline justify-between py-2"><span class="font-semibold text-navy-800">{s}</span><span class="text-slate-600">{r.n} · {r.value ? money(r.value) : '·'}</span></li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <p class="kicker text-navy-500">Recently updated</p>
+                  <ul class="num mt-2 divide-y divide-navy-600/10 text-sm">
+                    {art.recent.map((p) => (
+                      <li class="flex items-baseline justify-between gap-3 py-2">
+                        <a href={p.proposalUrl} target="_blank" rel="noopener" class="truncate font-semibold text-navy-800 hover:underline">{p.homeowner.name || p.name}{p.city ? ` · ${p.city}` : ''}</a>
+                        <span class="whitespace-nowrap text-xs text-slate-500">{p.status}{p.price ? ` · ${money(p.price)}` : ''}{p.categories.length ? ` · ${p.categories.join('/')}` : ''}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+              <p class="border-t border-navy-600/10 p-4 text-xs text-slate-500">
+                Read-only from Artemis. Proposal $ is finalSystemPrice per project. Register the webhook (Artemis Developer settings, URL /api/artemis-webhook/) and contract signatures post to Discord the moment they happen.
+              </p>
+            </div>
+          )}
+
+          <div class="mt-6">
+            <p class="kicker text-orange-700">Available next</p>
+            <h3 class="font-display mt-1 text-2xl font-bold uppercase tracking-tight text-navy-900">What else can be wired in</h3>
+            <div class="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {availableIntegrations.map((a) => (
+                <div class="flex flex-col border border-navy-600/20 bg-white p-5">
+                  <div class="flex items-baseline justify-between gap-3">
+                    <h4 class="font-display text-lg font-bold uppercase tracking-tight text-navy-800">{a.name}</h4>
+                    <span class="whitespace-nowrap rounded-full bg-navy-50 px-2 py-0.5 text-xs font-semibold text-navy-700">{a.effort}</span>
+                  </div>
+                  <p class="mt-2 grow text-sm text-slate-600">{a.unlocks}</p>
+                  <p class="mt-3 text-xs text-slate-500"><span class="font-semibold text-navy-700">Needs:</span> {a.needs}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+      </div>
+
+      <script is:inline>
+        // View switcher: hash = view. One render, instant switching.
+        (function () {
+          var VIEWS = ['overview', 'crm', 'revenue', 'month', 'ledger', 'spend', 'performance', 'pipeline', 'bookings', 'production', 'landing', 'proposals', 'integrations'];
+          function show(v) {
+            if (VIEWS.indexOf(v) < 0) v = 'overview';
+            document.querySelectorAll('[data-view]').forEach(function (s) {
+              // Explicit 'block': clearing the inline style would let the
+              // baseline stylesheet rule (which hides non-overview views on
+              // load) win again and blank the section.
+              s.style.display = s.getAttribute('data-view') === v ? 'block' : 'none';
+            });
+            document.querySelectorAll('[data-nav]').forEach(function (a) {
+              a.classList.toggle('nav-active', a.getAttribute('data-nav') === v);
+            });
+            window.scrollTo(0, 0);
+          }
+          window.addEventListener('hashchange', function () { show(location.hash.slice(1)); });
+          show(location.hash.slice(1));
+          // 360 pipeline table search (instant, client-side).
+          var crmSearch = document.getElementById('crm-search');
+          if (crmSearch) {
+            crmSearch.addEventListener('input', function () {
+              var q = crmSearch.value.trim().toLowerCase();
+              document.querySelectorAll('#crm-table tbody tr').forEach(function (tr) {
+                tr.style.display = !q || (tr.getAttribute('data-search') || '').indexOf(q) >= 0 ? '' : 'none';
+              });
+            });
+          }
+          // GET forms (month/range selectors) reload the page; carry the hash
+          // through so the reload lands back on the same view.
+          document.querySelectorAll('form[method="GET"]').forEach(function (f) {
+            f.addEventListener('submit', function () {
+              if (location.hash) f.setAttribute('action', '/dashboard/' + location.hash);
+            });
+          });
+        })();
+      </script>
+    </div>
+  )}
+</Layout>

@@ -1,0 +1,46 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Icon from '../components/Icon.astro';
+import { site, services } from '../data/site';
+---
+
+<Layout title="Page Not Found" description="The page you're looking for doesn't exist." noindex={true}>
+  <section class="section">
+    <div class="container-x max-w-xl text-center">
+      <p class="text-6xl font-display font-bold uppercase text-navy-200">404</p>
+      <h1 class="mt-4 text-3xl font-display font-bold uppercase text-navy-900">Page not found</h1>
+      <p class="mt-4 text-slate-600">
+        Sorry, we couldn't find that page. Call us, price your project, or jump to a service:
+      </p>
+      <div class="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
+        <a
+          href={`tel:${site.phoneRaw}`}
+          class="inline-flex items-center justify-center gap-2 rounded-none bg-orange-500 px-6 py-3 font-semibold uppercase tracking-wide text-navy-950 transition hover:bg-orange-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
+        >
+          <Icon name="phone" class="h-5 w-5" /> Call {site.phone}
+        </a>
+        <a
+          href="/estimate/"
+          class="inline-flex items-center justify-center gap-2 rounded-none border-2 border-navy-600 px-6 py-3 font-semibold uppercase tracking-wide text-navy-700 transition hover:bg-navy-600 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-navy-500 focus-visible:ring-offset-2"
+        >
+          Get an Instant Estimate
+        </a>
+      </div>
+      <div class="mt-8 grid gap-3 sm:grid-cols-3">
+        {
+          services.map((s) => (
+            <a
+              href={`/${s.slug}/`}
+              class="flex items-center justify-center gap-2 rounded-none border border-navy-600/20 bg-white px-4 py-3 font-display font-bold uppercase tracking-tight text-navy-800 transition hover:border-navy-600/60"
+            >
+              <Icon name={s.icon} class="h-5 w-5 text-navy-700" /> {s.name}
+            </a>
+          ))
+        }
+      </div>
+      <p class="mt-6 text-sm">
+        <a href="/" class="text-slate-500 underline hover:text-navy-700">Back to home</a>
+      </p>
+    </div>
+  </section>
+</Layout>

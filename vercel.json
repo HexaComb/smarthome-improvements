@@ -1,0 +1,130 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "astro",
+  "buildCommand": "node scripts/gen-updates.mjs && node scripts/fetch-rating.mjs && astro build && node scripts/indexnow.mjs",
+  "outputDirectory": "dist",
+  "trailingSlash": true,
+  "cleanUrls": false,
+  "redirects": [
+    {
+      "source": "/roofing/roof-replacement/",
+      "destination": "/roofing/residential-roofing/",
+      "permanent": true
+    },
+    {
+      "source": "/privacy-policy/",
+      "destination": "/privacy/",
+      "permanent": true
+    },
+    {
+      "source": "/leadership/",
+      "destination": "/about/",
+      "permanent": true
+    },
+    {
+      "source": "/services/",
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/shingles/",
+      "destination": "/roofing/",
+      "permanent": true
+    },
+    {
+      "source": "/portfolio/",
+      "destination": "/about/",
+      "permanent": true
+    },
+    {
+      "source": "/roofing-landing-page/",
+      "destination": "/roofing/",
+      "permanent": true
+    },
+    {
+      "source": "/windows-landing-page/",
+      "destination": "/windows/",
+      "permanent": true
+    },
+    {
+      "source": "/thank-you-page/",
+      "destination": "/thank-you/",
+      "permanent": true
+    },
+    {
+      "source": "/5-signs-its-time-to-replace-roof/",
+      "destination": "/blog/5-signs-its-time-to-replace-your-roof/",
+      "permanent": true
+    },
+    {
+      "source": "/how-proper-insulation-can-reduce-energy-costs/",
+      "destination": "/blog/how-proper-insulation-can-reduce-energy-costs/",
+      "permanent": true
+    },
+    {
+      "source": "/the-benefits-of-energy-efficient-windows-for-central-valley-homes/",
+      "destination": "/blog/benefits-of-energy-efficient-windows/",
+      "permanent": true
+    }
+  ],
+  "headers": [
+    {
+      "source": "/_astro/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/fonts/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/photos/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=2592000, stale-while-revalidate=86400"
+        }
+      ]
+    },
+    {
+      "source": "/(brand|illustrations|videos)/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=2592000, stale-while-revalidate=86400"
+        }
+      ]
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/weekly-report/",
+      "schedule": "0 15 * * 1"
+    },
+    {
+      "path": "/api/jn-sync/",
+      "schedule": "0 16 * * *"
+    },
+    {
+      "path": "/api/lead-poll/",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/contracts-alert/",
+      "schedule": "0 16 * * *"
+    },
+    {
+      "path": "/api/meta-sync/",
+      "schedule": "0 17 * * *"
+    }
+  ]
+}

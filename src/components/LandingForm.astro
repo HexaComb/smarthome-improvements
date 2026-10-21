@@ -1,0 +1,93 @@
+---
+import Icon from './Icon.astro';
+import Honeypot from './Honeypot.astro';
+import FormConsent from './FormConsent.astro';
+import { site } from '../data/site';
+import type { AdPlatform } from '../data/landing';
+
+interface Props {
+  platform: AdPlatform;
+  serviceName: string;
+  /** Override the lead_source tag (variant pages). */
+  leadSource?: string;
+  cta: string;
+  id?: string;
+}
+const { platform, serviceName, cta, id, leadSource: leadSourceOverride } = Astro.props;
+const formReady = site.formAccessKey.length > 0;
+// Default "<Platform> Ads - <Service>"; variant pages override so each
+// landing page is separable in the dashboard's per-page lead stats.
+const leadSource = leadSourceOverride ?? `${platform.name} Ads - ${serviceName}`;
+// Landing pages render this form twice (top + bottom), so field ids must be
+// unique per instance for the label[for] wiring.
+const uid = id ?? 'lf-' + Math.random().toString(36).slice(2, 8);
+const fid = (name: string) => `${uid}-${name}`;
+const labelCls = 'mb-1 block text-xs font-semibold text-slate-700';
+const inputCls = 'w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-200';
+---
+
+<div id={id} class="overflow-hidden rounded-2xl bg-white text-slate-800 shadow-2xl ring-1 ring-black/5">
+  <div class="h-1.5 w-full bg-gradient-to-r from-orange-500 to-orange-400"></div>
+  <div class="p-6 sm:p-7">
+  <div class="border-b border-slate-100 pb-4">
+    <div class="flex items-center justify-between gap-3">
+      <h2 class="font-display text-2xl font-bold uppercase tracking-tight text-navy-700">Claim your free inspection</h2>
+      <span class="flex items-center gap-1">
+        <span class="font-display text-lg font-bold text-navy-700">{site.rating.value}</span>
+        <Icon name="star" class="h-4 w-4 text-orange-500" />
+      </span>
+    </div>
+    <p class="mt-1 text-sm text-slate-500">Plus our free {serviceName.toLowerCase()} buyer's guide. No cost, no obligation.</p>
+  </div>
+  {!formReady && (
+    <p class="mt-4 rounded-lg bg-orange-50 p-3 text-xs text-orange-700 ring-1 ring-orange-200">
+      Add a Web3Forms key in <code class="font-mono">site.ts</code> to enable this form. Submissions are tagged "{leadSource}".
+    </p>
+  )}
+  <form method="POST" action="/api/lead/" class="mt-4 grid gap-3">
+    <input type="hidden" name="lead_source" value={leadSource} />
+    <input type="hidden" name="service" value={serviceName} />
+    <Honeypot />
+    <div class="grid gap-3 sm:grid-cols-2">
+      <div>
+        <label for={fid('name')} class={labelCls}>Full name *</label>
+        <input id={fid('name')} name="name" required autocomplete="name" class={inputCls} />
+      </div>
+      <div>
+        <label for={fid('phone')} class={labelCls}>Phone *</label>
+        <input id={fid('phone')} name="phone" type="tel" required autocomplete="tel" inputmode="tel" pattern="[0-9()+\-. ]{10,}" title="Enter a 10 digit phone number" class={inputCls} />
+      </div>
+      <div>
+        <label for={fid('email')} class={labelCls}>Email</label>
+        <input id={fid('email')} name="email" type="email" autocomplete="email" class={inputCls} />
+      </div>
+      <div>
+        <label for={fid('zip')} class={labelCls}>ZIP code</label>
+        <input id={fid('zip')} name="zip" autocomplete="postal-code" inputmode="numeric" pattern="[0-9]{5}(-[0-9]{4})?" title="Enter a 5 digit ZIP code" class={inputCls} />
+      </div>
+    </div>
+    <div class="grid gap-3 sm:grid-cols-2">
+      <div>
+        <label for={fid('address')} class={labelCls}>Street address</label>
+        <input id={fid('address')} name="address" autocomplete="street-address" class={inputCls} />
+      </div>
+      <div>
+        <label for={fid('city')} class={labelCls}>City</label>
+        <input id={fid('city')} name="city" autocomplete="address-level2" class={inputCls} />
+      </div>
+    </div>
+    <div>
+      <label for={fid('message')} class={labelCls}>Tell us about your project (optional)</label>
+      <textarea id={fid('message')} name="message" rows="2" class={inputCls}></textarea>
+    </div>
+    <button type="submit" disabled={!formReady} class="btn-primary w-full disabled:cursor-not-allowed disabled:opacity-50">
+      {cta}
+    </button>
+    <div class="flex items-center justify-center gap-x-4 gap-y-1 text-center text-xs text-slate-500">
+      <span class="inline-flex items-center gap-1"><Icon name="shield" class="h-3.5 w-3.5 text-navy-400" /> Your info is safe</span>
+      <span class="inline-flex items-center gap-1"><Icon name="check" class="h-3.5 w-3.5 text-navy-400" /> No spam, ever</span>
+    </div>
+    <FormConsent />
+  </form>
+  </div>
+</div>

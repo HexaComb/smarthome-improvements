@@ -1,0 +1,120 @@
+---
+import { site, nav } from '../data/site';
+import { services } from '../data/serviceContent';
+import Logo from './Logo.astro';
+import Seal from './Seal.astro';
+const year = new Date().getFullYear();
+const socials = [
+  { key: 'facebook', label: 'Facebook', href: site.social.facebook },
+  { key: 'instagram', label: 'Instagram', href: site.social.instagram },
+  { key: 'youtube', label: 'YouTube', href: site.social.youtube },
+  { key: 'tiktok', label: 'TikTok', href: site.social.tiktok },
+  { key: 'yelp', label: 'Yelp', href: site.social.yelp },
+].filter((s) => s.href && s.href !== '#');
+---
+
+<footer class="grain relative mt-auto overflow-hidden bg-navy-950 bg-blueprint text-navy-100">
+  <img
+    src="/brand/mark-white.svg"
+    alt=""
+    aria-hidden="true"
+    class="pointer-events-none absolute -right-10 -top-16 w-72 opacity-[0.06]"
+  />
+  <div class="container-x relative grid gap-10 py-14 sm:grid-cols-2 lg:grid-cols-4">
+    <div>
+      <Logo variant="white" class="h-12 w-auto" />
+      <p class="mt-5 text-sm leading-relaxed text-navy-200">
+        Quality roofing, windows, and insulation for {site.areaServed}. Licensed,
+        experienced, and done right the first time.
+      </p>
+      <p class="num mt-4 text-sm font-semibold text-white">CA License #{site.license}</p>
+      <Seal variant="navy" class="mt-5 h-32 w-32 text-orange-400" />
+    </div>
+
+    <div>
+      <h2 class="kicker text-navy-200">Services</h2>
+      <ul class="mt-4 space-y-2 text-sm">
+        {
+          services.map((s) => (
+            <li>
+              <a href={`/${s.slug}/`} class="inline-block py-1 font-medium text-navy-100 hover:text-orange-400">
+                {s.name}
+              </a>
+              <ul class="mt-1 space-y-1 pl-3">
+                {s.children.map((c) => (
+                  <li>
+                    <a href={`/${s.slug}/${c.slug}/`} class="inline-block py-1 text-navy-200 hover:text-orange-400">
+                      {c.name}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+
+    <div>
+      <h2 class="kicker text-navy-200">Company</h2>
+      <ul class="mt-4 space-y-2 text-sm">
+        {
+          nav
+            .filter((n) => !services.some((s) => `/${s.slug}/` === n.href) && n.href !== '/')
+            .map((n) => (
+              <li>
+                <a href={n.href} class="inline-block py-1 text-navy-200 hover:text-orange-400">
+                  {n.label}
+                </a>
+              </li>
+            ))
+        }
+        <li><a href="/financing/" class="inline-block py-1 text-navy-200 hover:text-orange-400">Financing</a></li>
+        <li><a href="/privacy/" class="inline-block py-1 text-navy-200 hover:text-orange-400">Privacy Policy</a></li>
+        <li><a href="/terms/" class="inline-block py-1 text-navy-200 hover:text-orange-400">Terms of Service</a></li>
+      </ul>
+    </div>
+
+    <div>
+      <h2 class="kicker text-navy-200">Contact</h2>
+      <ul class="mt-4 space-y-2 text-sm">
+        <li>
+          <a href={`tel:${site.phoneRaw}`} class="num inline-block py-1 text-navy-200 hover:text-orange-400">{site.phone}</a>
+        </li>
+        <li>
+          <a href={`mailto:${site.email}`} class="inline-block py-1 break-all text-navy-200 hover:text-orange-400">{site.email}</a>
+        </li>
+        <li class="text-navy-200">{site.city}, {site.region}. Serving {site.areaServed}.</li>
+      </ul>
+      <div class="mt-4">
+        <h3 class="kicker text-navy-200">Hours</h3>
+        <ul class="mt-2 space-y-1 text-sm">
+          {site.hours.map((h) => (
+            <li class="num flex justify-between gap-4">
+              <span class="text-navy-200">{h.days}</span><span class="text-navy-200">{h.time}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+      {
+        socials.length > 0 && (
+          <div class="mt-4 flex gap-3">
+            {socials.map((s) => (
+              <a href={s.href} class="inline-block py-1 text-navy-200 hover:text-orange-400" rel="noopener" target="_blank">
+                {s.label}
+              </a>
+            ))}
+          </div>
+        )
+      }
+    </div>
+  </div>
+
+  <div class="rule-dim text-navy-200/30" aria-hidden="true"></div>
+  <div>
+    <div class="container-x flex flex-col items-center justify-between gap-2 py-6 text-xs text-navy-200 sm:flex-row">
+      <p>© {year} Smart Home Improvements. All rights reserved. <span class="num">License #{site.license}</span>.</p>
+      <p>Serving Fresno &amp; the Central Valley, California.</p>
+    </div>
+  </div>
+</footer>

@@ -1,0 +1,76 @@
+---
+import SectionHead from './SectionHead.astro';
+import { cardSrcset } from '../lib/images';
+import type { Project } from '../data/projects';
+
+interface Props {
+  items: Project[];
+  eyebrow?: string;
+  heading?: string;
+  sub?: string;
+  tone?: 'light' | 'muted';
+  cta?: boolean;
+}
+const {
+  items,
+  eyebrow = 'Recent work',
+  heading = 'Projects across the Central Valley',
+  sub = 'Real roofs and windows we have installed for homeowners in Fresno, Clovis, Visalia, and beyond.',
+  tone = 'muted',
+  cta = true,
+} = Astro.props;
+---
+
+<section class:list={['section', tone === 'muted' ? 'bg-navy-50 bg-blueprint-light' : 'bg-white']}>
+  <div class="container-x">
+    <div class="flex flex-wrap items-end justify-between gap-4">
+      <SectionHead no="04" kicker={eyebrow} title={heading} class="max-w-2xl grow">
+        <p class="mt-3 max-w-prose text-slate-600">{sub}</p>
+      </SectionHead>
+      {
+        cta && (
+          <a href="/projects/" class="hidden btn-outline sm:inline-flex">
+            View all projects
+          </a>
+        )
+      }
+    </div>
+
+    <div class="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      {
+        items.map((p) => (
+          <figure class="group relative crops border border-navy-600/20 bg-white transition-colors hover:border-navy-600/50">
+            <div class="relative aspect-[4/3] overflow-hidden">
+              <img
+                src={p.image}
+                srcset={cardSrcset(p.image)}
+                sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 92vw"
+                alt={p.alt}
+                width="1400"
+                height="1050"
+                loading="lazy"
+                decoding="async"
+                class="h-full w-full object-cover"
+              />
+            </div>
+            <p class="spec-tag">{p.service} <span class="text-navy-200">·</span> {p.city}</p>
+            <figcaption class="p-5">
+              <h3 class="font-display text-lg font-bold uppercase tracking-tight text-navy-700">
+                {p.title}
+              </h3>
+              <p class="mt-2 text-sm text-slate-600">{p.blurb}</p>
+            </figcaption>
+          </figure>
+        ))
+      }
+    </div>
+
+    {
+      cta && (
+        <div class="mt-8 text-center sm:hidden">
+          <a href="/projects/" class="btn-outline">View all projects</a>
+        </div>
+      )
+    }
+  </div>
+</section>

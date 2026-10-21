@@ -1,0 +1,259 @@
+---
+import '../styles/global.css';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import StickyCta from '../components/StickyCta.astro';
+import Motion from '../components/Motion.astro';
+import CallRail from '../components/CallRail.astro';
+import AlivoChat from '../components/AlivoChat.astro';
+import { site } from '../data/site';
+import { platforms, ga4Ids } from '../data/landing';
+
+interface Props {
+  title: string;
+  description: string;
+  /** Path-only canonical, e.g. "/roofing/". Defaults to current URL. */
+  path?: string;
+  image?: string;
+  /** Extra JSON-LD objects to inject (Service, Article, FAQ, etc.) */
+  schema?: object[];
+  noindex?: boolean;
+  /** Preload hint for the page's LCP image (pass the same srcset/sizes as the img). */
+  preloadImage?: { href: string; imagesrcset?: string; imagesizes?: string };
+  /** Skip CallRail number swapping (internal docs pages that DOCUMENT the numbers). */
+  noSwap?: boolean;
+  /** Internal tool page: no site header, footer, sticky CTA, or motion script. */
+  bare?: boolean;
+  /** Where header/sticky quote CTAs point; homepage passes "#quote". */
+  ctaHref?: string;
+  /** Page language (html lang), e.g. "es" for the Spanish page. */
+  lang?: string;
+}
+
+const {
+  title,
+  description,
+  path,
+  image = '/og-default.jpg',
+  schema = [],
+  noindex = false,
+  preloadImage = undefined,
+  noSwap = false,
+  bare = false,
+  ctaHref = '/contact/',
+  lang = 'en',
+} = Astro.props;
+
+const canonical = new URL(path ?? Astro.url.pathname, site.url).href;
+const ogImage = new URL(image, site.url).href;
+const fullTitle = title.includes(site.name) ? title : `${title} | ${site.name}`;
+
+// Always-present LocalBusiness schema. Entity fields are CONSTANT across
+// pages (one @id = one set of values); per-page description/image live in the
+// page meta, never here.
+const localBusiness = {
+  '@context': 'https://schema.org',
+  '@type': 'RoofingContractor',
+  '@id': `${site.url}/#business`,
+  name: site.name,
+  image: new URL('/og-default.jpg', site.url).href,
+  url: site.url,
+  telephone: site.phoneRaw,
+  email: site.email,
+  priceRange: '$$',
+  address: {
+    '@type': 'PostalAddress',
+    addressLocality: site.city,
+    addressRegion: site.region,
+    addressCountry: 'US',
+  },
+  geo: {
+    '@type': 'GeoCoordinates',
+    latitude: 36.7378,
+    longitude: -119.7871,
+  },
+  areaServed: site.serviceCities.map((c) => ({
+    '@type': 'City',
+    name: `${c}, ${site.region}`,
+  })),
+  openingHoursSpecification: site.hoursSpec.map((h) => ({
+    '@type': 'OpeningHoursSpecification',
+    dayOfWeek: h.days,
+    opens: h.opens,
+    closes: h.closes,
+  })),
+  sameAs: Object.values(site.social).filter((u) => u !== '#'),
+  foundingDate: site.founded,
+  // AEO: entity-level topical signals + verifiable credential + free offers,
+  // so answer engines can ground "who is this business" without guessing.
+  knowsAbout: [
+    'roof replacement',
+    'roof repair',
+    'shingle roofing',
+    'replacement windows',
+    'Anlin windows',
+    'attic insulation',
+    'radiant barrier',
+    'Title 24 cool roof requirements',
+    'energy efficient home upgrades',
+  ],
+  hasCredential: {
+    '@type': 'EducationalOccupationalCredential',
+    credentialCategory: 'license',
+    name: `California Contractors State License #${site.license}`,
+    url: 'https://www.cslb.ca.gov/OnlineServices/CheckLicenseII/LicenseDetail.aspx?LicNum=1129883',
+  },
+  makesOffer: [
+    { '@type': 'Offer', name: 'Free 21-Point Roof Inspection', price: '0', priceCurrency: 'USD' },
+    { '@type': 'Offer', name: 'Free Window & Energy Assessment', price: '0', priceCurrency: 'USD' },
+    { '@type': 'Offer', name: 'Free Home Comfort & Energy Assessment', price: '0', priceCurrency: 'USD' },
+  ],
+  description: `Licensed California contractor (CA #${site.license}) providing roofing, window, and insulation services across ${site.areaServed}.`,
+};
+---
+
+<!doctype html>
+<html lang={lang}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script is:inline>document.documentElement.classList.add('js')</script>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    {noindex && <meta name="robots" content="noindex, nofollow" />}
+    <meta name="generator" content={Astro.generator} />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={site.name} />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={fullTitle} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+
+    <meta name="theme-color" content="#255188" />
+
+    <!-- Google tag, sitewide: GA4 analytics (page views, lead + estimate
+         events) and the Ads base tag (remarketing audiences + tag detection).
+         Ads conversion EVENTS fire only on /thank-you/ for paid leads. -->
+    {(platforms.google.pixelId || ga4Ids.length > 0) && (
+      <>
+        <script async src={`https://www.googletagmanager.com/gtag/js?id=${platforms.google.pixelId || ga4Ids[0]}`}></script>
+        <script is:inline define:vars={{ gid: platforms.google.pixelId, ga4s: ga4Ids }}>
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          window.gtag = window.gtag || gtag;
+          gtag('js', new Date());
+          if (gid) gtag('config', gid);
+          (ga4s || []).forEach(function (id) { if (id) gtag('config', id); });
+        </script>
+      </>
+    )}
+
+    <!-- Fonts: Barlow Condensed (display) + Barlow (body), closest free match to
+         Acumin Condensed. Self-hosted (public/fonts + @font-face in global.css);
+         preload the two above-the-fold weights. -->
+    <link rel="preload" as="font" type="font/woff2" href="/fonts/barlow-latin-400-normal.woff2" crossorigin />
+    <link rel="preload" as="font" type="font/woff2" href="/fonts/barlow-condensed-latin-700-normal.woff2" crossorigin />
+    {preloadImage && (
+      <link
+        rel="preload"
+        as="image"
+        href={preloadImage.href}
+        imagesrcset={preloadImage.imagesrcset}
+        imagesizes={preloadImage.imagesizes}
+        fetchpriority="high"
+      />
+    )}
+
+    <script
+      type="application/ld+json"
+      set:html={JSON.stringify(localBusiness)}
+    />
+    {
+      schema.map((s) => (
+        <script type="application/ld+json" set:html={JSON.stringify(s)} />
+      ))
+    }
+  </head>
+  <body class="flex min-h-screen flex-col bg-white text-slate-800">
+    <a
+      href="#main"
+      class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-navy-700 focus:px-4 focus:py-2 focus:text-white"
+      >Skip to content</a
+    >
+    {site.stormBanner && !bare && (
+      <>
+        <!-- Storm-season banner (site.stormBanner). Copy stays honest: we
+             prioritize storm calls (per /roofing/storm-damage/), no response-time
+             promises. Dismiss lasts the browser session (sessionStorage). -->
+        <div
+          id="storm-banner"
+          role="region"
+          aria-label="Storm season notice"
+          class="border-b border-navy-200/30 bg-navy-950 text-white"
+        >
+          <div class="container-x flex items-center justify-between gap-3 py-2 text-sm">
+            <p>
+              Roof leaking after a storm? We prioritize active leaks and storm calls.
+              <a
+                href="/roofing/storm-damage/"
+                class="font-semibold underline decoration-orange-400 underline-offset-2 hover:text-orange-400"
+                >Storm damage repair</a
+              >
+            </p>
+            <button
+              id="storm-dismiss"
+              type="button"
+              aria-label="Dismiss storm notice"
+              class="grid h-7 w-7 flex-shrink-0 place-items-center rounded-none border border-navy-200/40 text-navy-200 transition hover:border-white hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
+            >
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+        </div>
+        <script is:inline>
+          (function () {
+            var banner = document.getElementById('storm-banner');
+            if (!banner) return;
+            var KEY = 'shi-storm-banner-dismissed';
+            try {
+              if (sessionStorage.getItem(KEY) === '1') {
+                banner.remove();
+                return;
+              }
+            } catch (e) { /* storage unavailable: banner just shows */ }
+            var btn = document.getElementById('storm-dismiss');
+            if (btn)
+              btn.addEventListener('click', function () {
+                try {
+                  sessionStorage.setItem(KEY, '1');
+                } catch (e) { /* ignore */ }
+                banner.remove();
+              });
+          })();
+        </script>
+      </>
+    )}
+    {!bare && <Header ctaHref={ctaHref} />}
+    <main id="main" class="flex-1">
+      <slot />
+    </main>
+    {!bare && <Footer />}
+    {!bare && <StickyCta ctaHref={ctaHref} />}
+    {!bare && <Motion />}
+    {!bare && <AlivoChat />}
+    {!noSwap && <CallRail />}
+  </body>
+</html>

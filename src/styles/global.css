@@ -1,0 +1,472 @@
+@import 'tailwindcss';
+
+/* Self-hosted fonts (latin subsets from @fontsource, copied to public/fonts).
+   No third-party request before first paint; swap keeps text visible. */
+@font-face {
+  font-family: 'Barlow';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/barlow-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Barlow';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/barlow-latin-500-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Barlow';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/barlow-latin-600-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Barlow';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/barlow-latin-700-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Barlow Condensed';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/barlow-condensed-latin-500-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Barlow Condensed';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/barlow-condensed-latin-600-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Barlow Condensed';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/barlow-condensed-latin-700-normal.woff2') format('woff2');
+}
+
+/*
+  Brand: Smart Home Improvements
+  Navy   #255188 (Pantone 105-15 C)   primary
+  Periw. #A9C0E3 (Pantone 106-3 C)    soft accent
+  Orange #F6871F (Pantone 24-8 C)     action / energy
+  Type:  Acumin Condensed -> Barlow Condensed (display) + Barlow (body)
+*/
+@theme {
+  --color-navy-50: #eef3f9;
+  --color-navy-100: #d8e3f1;
+  --color-navy-200: #a9c0e3; /* brand periwinkle */
+  --color-navy-300: #7ea3cf;
+  --color-navy-400: #4a79b2;
+  --color-navy-500: #2f6098;
+  --color-navy-600: #255188; /* brand navy */
+  --color-navy-700: #1f4373;
+  --color-navy-800: #1a3860;
+  --color-navy-900: #142a48;
+  --color-navy-950: #0e1d33;
+
+  --color-orange-50: #fff5ea;
+  --color-orange-100: #ffe6cc;
+  --color-orange-200: #fdc88a;
+  --color-orange-400: #f9a04d;
+  --color-orange-500: #f6871f; /* brand orange */
+  --color-orange-600: #df7110;
+  --color-orange-700: #b8560f; /* AA-passing small text on white (4.8:1) */
+
+  --color-periwinkle: #a9c0e3;
+
+  --font-display: 'Barlow Condensed', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Barlow', ui-sans-serif, system-ui, sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+body {
+  font-family: var(--font-sans);
+  font-size: 1.0625rem; /* 17px base for comfortable reading */
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Nav / UI label: readable non-condensed brand voice (uppercase, spaced) */
+.nav-link {
+  font-family: var(--font-sans);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+/* ---- Scroll reveal motion (only hides when JS is active, so no-JS users always see content) ---- */
+.reveal {
+  transition:
+    opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+html.js .reveal:not(.is-visible) {
+  opacity: 0;
+  transform: translateY(22px);
+  will-change: opacity, transform;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/* ---- Hover lift for cards ---- */
+.lift {
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
+}
+.lift:hover {
+  transform: translateY(-4px);
+}
+
+/* ---- Lightbox ---- */
+.lb-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(14, 29, 51, 0.92);
+  padding: 1.5rem;
+}
+.lb-overlay.open {
+  display: flex;
+}
+.lb-overlay img {
+  max-height: 88vh;
+  max-width: 92vw;
+  border-radius: 0.75rem;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5);
+}
+.lb-btn {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  height: 3rem;
+  width: 3rem;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-size: 1.5rem;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+.lb-btn:hover {
+  background: var(--color-orange-500);
+}
+
+/* Display type: condensed, tight, slightly upper-tracked for the Acumin feel */
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: 0.005em;
+}
+/* .kicker v2 lives in the Plan Set system at the end of this file */
+
+/* Buttons */
+.btn,
+.btn-primary,
+.btn-secondary,
+.btn-outline,
+.btn-ghost {
+  @apply inline-flex items-center justify-center gap-2 rounded-md px-6 py-3 font-semibold uppercase tracking-wide transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2;
+  font-family: var(--font-sans);
+  letter-spacing: 0.04em;
+}
+.btn-primary {
+  /* navy text on brand orange: 6.8:1 contrast (white text fails AA at 2.2:1) */
+  @apply bg-orange-500 text-navy-950 hover:bg-orange-600 focus-visible:ring-orange-500;
+}
+.btn-secondary {
+  @apply border-2 border-white/80 text-white hover:bg-white hover:text-navy-700 focus-visible:ring-white;
+}
+.btn-outline {
+  @apply border-2 border-navy-600 text-navy-700 hover:bg-navy-600 hover:text-white focus-visible:ring-navy-500;
+}
+.btn-ghost {
+  @apply bg-navy-600 text-white hover:bg-navy-700 focus-visible:ring-navy-500;
+}
+
+/* Layout helpers */
+.container-x {
+  @apply mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8;
+}
+.section {
+  @apply py-16 sm:py-20 lg:py-24;
+}
+
+/* Headings. In @layer components so Tailwind utilities (@layer utilities,
+   which wins over components) can override the navy default, e.g. text-white
+   on dark sections. Unlayered rules would beat every utility. */
+@layer components {
+  .h-display {
+    font-family: var(--font-display);
+    @apply font-bold uppercase leading-[0.95] tracking-tight text-navy-700;
+  }
+  .h-section {
+    font-family: var(--font-display);
+    @apply text-3xl font-bold uppercase tracking-tight text-navy-700 sm:text-4xl;
+  }
+}
+
+/* Blog / long-form */
+.prose-content :is(h2) {
+  font-family: var(--font-display);
+  @apply mt-10 mb-3 text-2xl font-bold uppercase tracking-tight text-navy-700;
+}
+.prose-content :is(h3) {
+  font-family: var(--font-display);
+  @apply mt-8 mb-2 text-xl font-semibold text-navy-700;
+}
+.prose-content p {
+  @apply mb-4 leading-relaxed text-slate-700;
+}
+.prose-content ul {
+  @apply mb-4 list-disc space-y-2 pl-6 text-slate-700;
+}
+.prose-content ol {
+  @apply mb-4 list-decimal space-y-3 pl-6 text-slate-700;
+}
+.prose-content a {
+  @apply font-semibold text-navy-600 underline decoration-orange-400 underline-offset-2 hover:text-navy-700;
+}
+
+/* Mega menu opened by tap on touch devices (Header.astro script toggles .open) */
+nav[aria-label='Primary'] .group.open > div {
+  visibility: visible;
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+/* Before/after slider: surface keyboard focus on the visible handle */
+[data-ba]:has(input:focus-visible) .ba-line span {
+  outline: 3px solid var(--color-orange-500);
+  outline-offset: 2px;
+}
+
+/* ================= PLAN SET SYSTEM (append to global.css) ================= */
+
+/* Engineered figures: apply to every number sitewide (phone, license, stats, hours) */
+.num { font-variant-numeric: tabular-nums lining-nums; }
+
+/* Kicker v2 REPLACES the existing .kicker block: drafting-annotation voice.
+   Wide tracking moves to the body face; condensed display faces stay at .005em. */
+.kicker {
+  font-family: var(--font-sans);
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  font-weight: 600;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Hero display scale (home H1, PageHero size='lg') */
+.h-hero {
+  font-family: var(--font-display);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+  line-height: 0.9;
+  font-size: clamp(2.75rem, 6vw, 4.5rem);
+}
+/* Quiet big sub-statement voice (Barlow Condensed 500, normal case) */
+.h-sub {
+  font-family: var(--font-display);
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0.005em;
+}
+
+/* Sheet number square, used in SectionHead title blocks */
+.sheet-no {
+  display: grid;
+  place-items: center;
+  height: 1.75rem;
+  width: 1.75rem;
+  flex-shrink: 0;
+  border: 1px solid rgb(37 81 136 / 0.3);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.875rem;
+  color: var(--color-navy-700);
+  font-variant-numeric: tabular-nums;
+}
+.sheet-no-dark {
+  border-color: rgb(169 192 227 / 0.4);
+  color: var(--color-navy-200);
+}
+
+/* Dimension rule: measurement line with minor ticks and 2px end ticks.
+   Color from currentColor, e.g. class="rule-dim w-24 text-orange-500" */
+.rule-dim {
+  position: relative;
+  height: 1px;
+  background: currentColor;
+}
+.rule-dim::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -3px;
+  height: 7px;
+  background-image: repeating-linear-gradient(90deg, currentColor 0 1px, transparent 1px 12px);
+}
+.rule-dim::after {
+  content: '';
+  position: absolute;
+  inset: -5px 0;
+  border-left: 2px solid currentColor;
+  border-right: 2px solid currentColor;
+}
+
+/* Blueprint grid: periwinkle ink on navy-900/950 (24px minor, 120px major, max 8% alpha) */
+.bg-blueprint {
+  background-image:
+    repeating-linear-gradient(0deg, rgb(169 192 227 / 0.05) 0 1px, transparent 1px 24px),
+    repeating-linear-gradient(90deg, rgb(169 192 227 / 0.05) 0 1px, transparent 1px 24px),
+    repeating-linear-gradient(0deg, rgb(169 192 227 / 0.08) 0 1px, transparent 1px 120px),
+    repeating-linear-gradient(90deg, rgb(169 192 227 / 0.08) 0 1px, transparent 1px 120px);
+}
+/* Vellum: navy ink grid for light bands (use on bg-navy-50; replaces slate-50 slabs) */
+.bg-blueprint-light {
+  background-image:
+    repeating-linear-gradient(0deg, rgb(37 81 136 / 0.05) 0 1px, transparent 1px 24px),
+    repeating-linear-gradient(90deg, rgb(37 81 136 / 0.05) 0 1px, transparent 1px 24px);
+}
+
+/* Grain: one shared data URI, dark sections only, 3%, pointer-safe */
+.grain { position: relative; }
+.grain::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.03;
+  background-image: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22160%22 height=%22160%22%3E%3Cfilter id=%22n%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 numOctaves=%222%22/%3E%3C/filter%3E%3Crect width=%22160%22 height=%22160%22 filter=%22url(%23n)%22/%3E%3C/svg%3E');
+}
+
+/* Spec tag: jobsite photo-log label. Separators are middle dots, never dashes. */
+.spec-tag {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--color-navy-950);
+  color: #fff;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 0.6875rem;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-variant-numeric: tabular-nums;
+}
+.spec-tag-ghost {
+  background: transparent;
+  padding: 0;
+}
+
+/* Crop marks: inspector's registration marks, orange, hover or permanent (.crops-on) */
+.crops { position: relative; }
+.crops::before,
+.crops::after {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--color-orange-500);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+.crops::before { top: -1px; left: -1px; border-right: 0; border-bottom: 0; }
+.crops::after { bottom: -1px; right: -1px; border-left: 0; border-top: 0; }
+.crops:hover::before,
+.crops:hover::after,
+.crops:focus-visible::before,
+.crops:focus-visible::after,
+.crops-on::before,
+.crops-on::after { opacity: 1; }
+
+/* Outline index numerals (decorative, aria-hidden; real number lives in adjacent text) */
+.num-outline {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(3.5rem, 6vw, 6rem);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-navy-200);
+}
+@supports (-webkit-text-stroke: 1px black) {
+  .num-outline {
+    color: transparent;
+    -webkit-text-stroke: 1.5px var(--color-navy-400);
+  }
+  .num-outline-dark { -webkit-text-stroke-color: rgb(169 192 227 / 0.7); }
+}
+
+/* Navy duotone for MOOD photography ONLY (hero backgrounds, CtaBand).
+   Evidence photos (projects, gallery, before/after, crew) stay full color. */
+.duo {
+  /* Position comes from utility classes at the usage site (absolute inset-0);
+     declaring it here would override Tailwind's layered utilities. */
+  isolation: isolate;
+  background: var(--color-navy-700);
+}
+.duo > img {
+  filter: grayscale(1) contrast(1.25);
+  mix-blend-mode: luminosity;
+  opacity: 0.7;
+}
+
+/* Blog prose: tables, quotes, figures (cost guides render real pricing tables). */
+.prose-content table {
+  width: 100%;
+  margin: 1.5rem 0;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.95rem;
+}
+.prose-content thead th {
+  text-align: left;
+  font-family: var(--font-display, inherit);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.8rem;
+  color: var(--color-navy-600, #255188);
+  border-bottom: 2px solid rgb(37 81 136 / 0.25);
+  padding: 0.6rem 0.75rem;
+}
+.prose-content tbody td {
+  border-bottom: 1px solid rgb(37 81 136 / 0.12);
+  padding: 0.6rem 0.75rem;
+  vertical-align: top;
+}
+.prose-content blockquote {
+  margin: 1.5rem 0;
+  border-left: 2px solid var(--color-orange-500, #f6871f);
+  padding-left: 1.25rem;
+  color: rgb(51 65 85);
+}
+.prose-content img {
+  margin: 1.75rem 0 0.5rem;
+  border: 1px solid rgb(37 81 136 / 0.2);
+}

@@ -1,0 +1,72 @@
+---
+// A2P 10DLC consent block, carrier-reviewer pattern (per the JobNimbus /
+// campaign verification requirements): TWO separate checkboxes, neither
+// pre-checked, neither required, with the full disclosure language directly
+// next to each box (not behind a link):
+//   1. informational SMS about the request (sms_consent)
+//   2. promotional/marketing SMS + email (marketing_optin)
+// /api/lead.ts enforces box 1: leads who do not check it get SMS DND set in
+// GoHighLevel, so automations reach them by call and email only.
+// lang="es" renders the same disclosures in Spanish (same meaning, same
+// STOP/HELP mechanics) for the /es/ page.
+interface Props {
+  /** dark = on navy card backgrounds */
+  tone?: 'light' | 'dark';
+  lang?: 'en' | 'es';
+}
+const { tone = 'light', lang = 'en' } = Astro.props;
+const label = tone === 'dark' ? 'text-navy-100' : 'text-slate-600';
+const link = tone === 'dark' ? 'text-navy-100 underline hover:text-white' : 'text-navy-700 underline hover:text-navy-900';
+const box = 'mt-0.5 h-4 w-4 flex-shrink-0 rounded-sm border-slate-400 accent-orange-500';
+const es = lang === 'es';
+---
+
+<div class="mt-2 space-y-2.5">
+  <label class:list={['flex cursor-pointer items-start gap-2.5 text-xs leading-relaxed', label]}>
+    <input type="checkbox" name="sms_consent" value="yes" class={box} />
+    <span>
+      {es ? (
+        <>
+          Acepto recibir mensajes de texto SMS informativos de Smart Home Improvements
+          relacionados con mi solicitud, incluyendo programación de citas y
+          actualizaciones del servicio, al número que proporcioné. La frecuencia de
+          mensajes varía. Pueden aplicar tarifas de mensajes y datos. Responda STOP
+          para cancelar, HELP para ayuda. El consentimiento no es condición de compra.
+        </>
+      ) : (
+        <>
+          I agree to receive informational SMS text messages from Smart Home
+          Improvements related to my request, including appointment scheduling and
+          service updates, at the number I provided. Message frequency varies.
+          Msg &amp; data rates may apply. Reply STOP to opt out, HELP for help.
+          Consent is not a condition of purchase.
+        </>
+      )}
+    </span>
+  </label>
+  <label class:list={['flex cursor-pointer items-start gap-2.5 text-xs leading-relaxed', label]}>
+    <input type="checkbox" name="marketing_optin" value="yes" class={box} />
+    <span>
+      {es ? (
+        <>
+          Acepto recibir mensajes de texto SMS promocionales y de marketing de Smart
+          Home Improvements, como ofertas y recordatorios. La frecuencia de mensajes
+          varía. Pueden aplicar tarifas de mensajes y datos. Responda STOP para
+          cancelar, HELP para ayuda. El consentimiento no es condición de compra.
+        </>
+      ) : (
+        <>
+          I agree to receive promotional and marketing SMS text messages from Smart
+          Home Improvements, such as offers and reminders. Message
+          frequency varies. Msg &amp; data rates may apply. Reply STOP to opt out,
+          HELP for help. Consent is not a condition of purchase.
+        </>
+      )}
+    </span>
+  </label>
+  <p class:list={['text-[0.7rem] leading-relaxed', label]}>
+    {es ? 'Consulte nuestra' : 'Please see our'}&nbsp;<a href="/privacy/" class={link}>{es ? 'Política de Privacidad' : 'Privacy Policy'}</a>&nbsp;{es ? 'y' : 'and'}&nbsp;<a
+      href="/terms/"
+      class={link}>{es ? 'Términos de Servicio' : 'Terms of Service'}</a>.
+  </p>
+</div>

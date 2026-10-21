@@ -1,0 +1,33 @@
+---
+import Icon from './Icon.astro';
+import { site } from '../data/site';
+// `animate: false` keeps the rating and the 100% stat static; counting those up
+// from 0 briefly shows wrong trust numbers ("1.5 Google rating").
+const stats = [
+  { num: site.yearsInBusiness, suffix: '+', label: 'Years serving the Valley', animate: true },
+  { num: site.rating.value, suffix: '', label: 'Google rating', stars: true, animate: false },
+  { num: site.rating.count, suffix: '', label: 'Google reviews', animate: true },
+  { num: 100, suffix: '%', label: 'Licensed & local', animate: false },
+];
+---
+
+<section class="relative overflow-hidden bg-navy-950 bg-blueprint grain">
+  <img src="/brand/mark-white.svg" alt="" aria-hidden="true" class="pointer-events-none absolute -right-10 top-1/2 hidden w-64 -translate-y-1/2 opacity-[0.05] sm:block" />
+  <div class="container-x relative grid grid-cols-2 gap-y-8 py-12 lg:grid-cols-4" data-stagger>
+    {
+      stats.map((s) => (
+        <div class="flex flex-col items-start border-navy-200/20 text-left lg:[&:not(:first-child)]:border-l lg:[&:not(:first-child)]:pl-8">
+          <div class="font-display num flex items-baseline text-5xl font-bold leading-none text-white sm:text-6xl">
+            <span data-count={s.animate ? String(s.num) : undefined}>{s.num}</span><span class="text-orange-400">{s.suffix}</span>
+          </div>
+          {s.stars && (
+            <div class="mt-2 flex text-orange-400" aria-hidden="true">
+              {Array.from({ length: 5 }).map(() => <Icon name="star" class="h-4 w-4" />)}
+            </div>
+          )}
+          <div class="spec-tag spec-tag-ghost mt-2 text-navy-200!">{s.label}</div>
+        </div>
+      ))
+    }
+  </div>
+</section>

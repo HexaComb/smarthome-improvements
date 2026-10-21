@@ -1,0 +1,24 @@
+---
+interface Props {
+  items: { name: string; path: string }[];
+  light?: boolean; // for dark backgrounds
+}
+const { items, light = false } = Astro.props;
+---
+
+<nav aria-label="Breadcrumb" class:list={['text-sm', light ? 'text-navy-200' : 'text-slate-500']}>
+  {
+    items.map((it, i) => (
+      <Fragment>
+        {i > 0 && <span class="px-1.5 opacity-60">/</span>}
+        {i < items.length - 1 ? (
+          <a href={it.path} class:list={['hover:underline', light ? 'hover:text-white' : 'hover:text-navy-700']}>
+            {it.name}
+          </a>
+        ) : (
+          <span class={light ? 'text-white' : 'text-navy-700'}>{it.name}</span>
+        )}
+      </Fragment>
+    ))
+  }
+</nav>

@@ -1,0 +1,40 @@
+---
+// License seal: flat-ink licensure stamp for the plan-set system. Real plan
+// sheets carry the licensure stamp, so this is structurally native, not kitsch.
+// Rules: no rotation, no distress, real license data only, aria-hidden (the
+// license always appears as real text adjacent to the seal). Exactly two
+// placements sitewide: Guarantee section and the footer NAP column.
+import { site } from '../data/site';
+
+interface Props {
+  /** paper = navy ink on light bg; navy = for dark bg (pass text color via class). */
+  variant?: 'paper' | 'navy';
+  class?: string;
+}
+const { variant = 'paper', class: cls = '' } = Astro.props;
+const mark = variant === 'navy' ? '/brand/mark-white.svg' : '/brand/mark-navy.svg';
+// Ring circumference is ~414px at r=66; keep the text short enough to fit.
+const ringText = `Licensed CA Contractor · Lic #${site.license} · Fresno ·`;
+// The seal renders more than once per page; ids must be unique per instance.
+const rid = `seal-ring-${crypto.randomUUID().slice(0, 6)}`;
+---
+
+<svg
+  viewBox="0 0 160 160"
+  class:list={[variant === 'paper' && 'text-navy-700', cls]}
+  aria-hidden="true"
+  role="presentation"
+>
+  <circle cx="80" cy="80" r="77" fill="none" stroke="currentColor" stroke-width="2"></circle>
+  <circle cx="80" cy="80" r="56" fill="none" stroke="currentColor" stroke-width="1"></circle>
+  <defs>
+    <path id={rid} d="M 80 14 A 66 66 0 1 1 79.99 14" fill="none"></path>
+  </defs>
+  <text
+    fill="currentColor"
+    style="font-family: var(--font-sans); font-weight: 600; font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase;"
+  >
+    <textPath href={`#${rid}`}>{ringText}</textPath>
+  </text>
+  <image href={mark} x="52" y="52" width="56" height="56"></image>
+</svg>

@@ -1,0 +1,212 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Icon from '../components/Icon.astro';
+import { site } from '../data/site';
+import { platforms, offerFor, adServices } from '../data/landing';
+
+const booking = site.booking;
+
+// Ad-platform conversion config, serialized for the inline script below. Only
+// IDs (no secrets). The script fires a conversion ONLY when the redirect from
+// /api/lead/ carries ?src=<platform> (paid landing-page leads), so main-site
+// form fills never ping the ad platforms.
+const conv = {
+  google: { id: platforms.google.pixelId, label: platforms.google.conversionLabel },
+  facebook: { id: platforms.facebook.pixelId },
+  microsoft: { id: platforms.microsoft.pixelId },
+};
+
+const guides = adServices.map((s) => ({
+  service: s,
+  title: offerFor[s].guideTitle,
+  path: offerFor[s].guidePath,
+}));
+
+// Published inspection names per service, for the "what happens next" strip.
+// A tiny script below swaps the generic step 2 title for the matching one
+// when the redirect carries ?service=roofing|windows|insulation.
+const inspectionNames = Object.fromEntries(adServices.map((s) => [s, offerFor[s].inspectionName]));
+
+const steps = [
+  {
+    no: '01',
+    title: 'We call you',
+    text: 'A real person calls to confirm your details and set a time. We call within one business day, usually much sooner.',
+  },
+  {
+    no: '02',
+    title: 'Free inspection',
+    text: 'We inspect at your home and photo-document what we find, so you see exactly what we see.',
+  },
+  {
+    no: '03',
+    title: 'Written quote',
+    text: 'You get an honest, no-pressure written quote. Nothing moves forward until you say so.',
+  },
+];
+---
+
+<Layout
+  title="Thank You"
+  description="Thanks for contacting Smart Home Improvements. We'll be in touch shortly."
+  path="/thank-you/"
+  noindex={true}
+>
+  <section class="section">
+    <div class="container-x max-w-2xl text-center">
+      <span class="mx-auto grid h-16 w-16 place-items-center border border-navy-600/20 bg-navy-50 text-navy-700">
+        <Icon name="check" class="h-8 w-8" />
+      </span>
+      <p class="kicker mt-6 text-orange-700">Request received</p>
+      <h1 class="mt-2 text-3xl font-display font-bold uppercase text-navy-900 sm:text-4xl">
+        A real person calls you next.
+      </h1>
+      <p class="mt-4 text-slate-600">
+        Your request is in. We call within one business day, usually much sooner. Need to reach us right now?
+      </p>
+      <div class="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
+        <a href={`tel:${site.phoneRaw}`} class="btn-primary">Call {site.phone}</a>
+        <a href={`sms:${site.smsRaw}`} class="btn-outline">Text us instead</a>
+      </div>
+      <p class="mt-4 text-sm">
+        <a href="/" class="text-slate-500 underline hover:text-navy-700">Back to home</a>
+      </p>
+
+      <!-- What happens next: three steps; step 2's title swaps to the matching
+           published inspection name when ?service= is present (script below). -->
+      <div class="mt-10 border-y border-navy-600/15 text-left">
+        <div class="grid divide-y divide-navy-600/10 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+          {steps.map((s, i) => (
+            <div class="p-5">
+              <p class="kicker num text-navy-500">
+                Step {s.no}
+              </p>
+              <h2
+                id={i === 1 ? 'step-inspection-title' : undefined}
+                class="font-display mt-1 text-lg font-bold uppercase tracking-tight text-navy-800"
+              >
+                {s.title}
+              </h2>
+              <p class="mt-1 text-sm text-slate-600">{s.text}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <!-- Self-book: shown only when the lead's service has a GHL calendar
+           (?service=roofing|windows). The iframe is injected client-side so
+           other leads never load the widget. -->
+      <div id="booking" class="mt-10 hidden text-left">
+        <div class="border border-navy-600/20 bg-white p-6">
+          <h2 class="font-display text-lg font-bold uppercase tracking-tight text-navy-700">Want to skip the phone tag?</h2>
+          <p class="mt-1 text-sm text-slate-600">Pick a time that works and your free inspection is on the calendar. Done.</p>
+          <div id="booking-slot" class="mt-4"></div>
+        </div>
+      </div>
+
+      <!-- Free buyer's guides (LP leads were promised one; the matching guide is
+           highlighted by the script below, others stay available). -->
+      <div id="guides" class="mt-10 border border-navy-600/20 bg-navy-50 bg-blueprint-light p-6 text-left">
+        <h2 class="font-display text-lg font-bold uppercase tracking-tight text-navy-700">Your free buyer's guides</h2>
+        <p class="mt-1 text-sm text-slate-600">Download and read while you wait for our call.</p>
+        <ul class="mt-4 space-y-2">
+          {guides.map((g) => (
+            <li data-guide={g.service}>
+              <a
+                href={g.path}
+                target="_blank"
+                rel="noopener"
+                class="flex items-center gap-3 border border-navy-600/20 bg-white p-3 transition hover:border-navy-600/60"
+              >
+                <span class="grid h-9 w-9 flex-shrink-0 place-items-center bg-orange-100 text-orange-600">
+                  <Icon name="arrow" class="h-4 w-4" />
+                </span>
+                <span class="text-sm font-semibold text-navy-700">{g.title}</span>
+                <span class="ml-auto text-xs uppercase tracking-wide text-slate-400">PDF</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <script is:inline define:vars={{ inspectionNames }}>
+    // Swap the generic step 2 title for the published inspection name that
+    // matches ?service=. Separate from the tracking script below on purpose:
+    // this must never interfere with conversion firing.
+    try {
+      var svcName = new URLSearchParams(location.search).get('service');
+      if (svcName && inspectionNames[svcName]) {
+        var el = document.getElementById('step-inspection-title');
+        if (el) el.textContent = 'Free ' + inspectionNames[svcName];
+      }
+    } catch (e) { /* strip stays generic */ }
+  </script>
+
+  <script is:inline define:vars={{ conv, booking }}>
+    // 1) Highlight the guide the lead was actually promised (?service=...).
+    // 2) Offer self-booking when the service has a GHL calendar.
+    // 3) Fire the ad-platform conversion event for paid LP leads (?src=...).
+    try {
+      var q = new URLSearchParams(location.search);
+      var svc = q.get('service');
+      if (svc && ['roofing', 'windows', 'insulation'].indexOf(svc) >= 0) {
+        document.querySelectorAll('#guides [data-guide]').forEach(function (li) {
+          if (li.getAttribute('data-guide') !== svc) li.style.display = 'none';
+        });
+      }
+      if (svc && booking[svc]) {
+        var wrap = document.getElementById('booking');
+        var frame = document.createElement('iframe');
+        frame.src = booking[svc];
+        frame.id = 'ghl-booking-' + svc;
+        frame.setAttribute('scrolling', 'no');
+        frame.style.cssText = 'width:100%;border:none;overflow:hidden;min-height:640px;';
+        document.getElementById('booking-slot').appendChild(frame);
+        wrap.classList.remove('hidden');
+        var rs = document.createElement('script');
+        rs.async = true; rs.src = 'https://link.msgsndr.com/js/form_embed.js';
+        document.head.appendChild(rs);
+      }
+      var src = q.get('src');
+      // GA4: every thank-you view is a lead; source dimension separates
+      // paid LP leads (?src=) from main-site form fills. The gtag loader is
+      // sitewide (Layout), so window.gtag already exists.
+      if (window.gtag) {
+        window.gtag('event', 'generate_lead', {
+          lead_source: src || 'website',
+          service: svc || '(none)',
+        });
+      }
+      var loaded = function (url, cb) {
+        var s = document.createElement('script');
+        s.async = true; s.src = url;
+        if (cb) s.onload = cb;
+        document.head.appendChild(s);
+      };
+      if (src === 'google' && conv.google.id && conv.google.label) {
+        window.dataLayer = window.dataLayer || [];
+        if (!window.gtag) { window.gtag = function () { dataLayer.push(arguments); }; gtag('js', new Date()); gtag('config', conv.google.id); }
+        if (!document.querySelector('script[src*="googletagmanager.com/gtag"]')) {
+          loaded('https://www.googletagmanager.com/gtag/js?id=' + conv.google.id);
+        }
+        gtag('event', 'conversion', { send_to: conv.google.id + '/' + conv.google.label });
+      } else if (src === 'facebook' && conv.facebook.id) {
+        !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');
+        fbq('init', conv.facebook.id);
+        fbq('track', 'PageView');
+        fbq('track', 'Lead');
+      } else if (src === 'microsoft' && conv.microsoft.id) {
+        window.uetq = window.uetq || [];
+        loaded('//bat.bing.com/bat.js', function () {
+          var o = { ti: conv.microsoft.id };
+          o.q = window.uetq;
+          window.uetq = new UET(o);
+          window.uetq.push('pageLoad');
+          window.uetq.push('event', 'submit_lead_form', {});
+        });
+      }
+    } catch (e) { /* tracking must never break the page */ }
+  </script>
+</Layout>

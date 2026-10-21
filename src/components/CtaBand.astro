@@ -1,0 +1,52 @@
+---
+import { site } from '../data/site';
+import { webpSrcset, cardSrcset } from '../lib/images';
+interface Props {
+  heading?: string;
+  sub?: string;
+  image?: string;
+  /** Quote CTA target; homepage passes "#quote" to keep visitors on-page. */
+  href?: string;
+}
+const {
+  heading = 'Ready to get started?',
+  sub = 'Get a free, no-obligation estimate today. We respond fast and treat your home like our own.',
+  image,
+  href = '/contact/',
+} = Astro.props;
+---
+
+<section class:list={['relative overflow-hidden', image ? 'bg-navy-900' : 'bg-navy-950 bg-blueprint grain']}>
+  {
+    image && (
+      <>
+        <div class="duo absolute inset-0">
+          <img
+            src={image}
+            srcset={webpSrcset(image) ?? cardSrcset(image)}
+            sizes="100vw"
+            alt=""
+            aria-hidden="true"
+            width="2000"
+            height="1100"
+            loading="lazy"
+            decoding="async"
+            class="h-full w-full object-cover"
+          />
+        </div>
+        <div class="absolute inset-0 bg-gradient-to-r from-navy-950 via-navy-950/85 to-navy-950/40" />
+      </>
+    )
+  }
+  <div class="container-x relative flex flex-col items-center gap-6 py-16 text-center lg:flex-row lg:justify-between lg:text-left">
+    <div>
+      <h2 class="font-display text-3xl font-bold uppercase text-white sm:text-4xl">{heading}</h2>
+      <div class="rule-dim mx-auto mt-4 w-24 text-orange-500 lg:mx-0" aria-hidden="true"></div>
+      <p class="mt-4 max-w-xl text-navy-100">{sub}</p>
+    </div>
+    <div class="flex flex-shrink-0 flex-col gap-3 sm:flex-row">
+      <a href={href} class="btn-primary">Get a Free Quote</a>
+      <a href={`tel:${site.phoneRaw}`} class="btn-secondary">Call {site.phone}</a>
+    </div>
+  </div>
+</section>

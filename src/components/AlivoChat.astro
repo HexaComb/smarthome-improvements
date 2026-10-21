@@ -1,0 +1,18 @@
+---
+// Alivo AI chat widget (web chat + lead follow-up). Config + loader supplied by
+// Alivo. The widget stays hidden until Alivo enables the agent on their side, so
+// this is inert until then. Loaded sitewide on non-bare pages via Layout.astro.
+// IDs here are public widget identifiers, not secrets.
+---
+<script is:inline>
+  window.AlivoChatConfig = {
+    companyName: 'smarthomeimprovements',
+    companyId: 'ffa100d3-74c6-4a28-a7fd-16196dfe37c6',
+    primaryColor: '#ED821F',
+    domain: 'https://app.alivo.ai',
+    apiBase: 'https://alivo-api-production.azurewebsites.net',
+    companyIntegrationId: 'cf4f5964-2927-49d3-9be7-0e7e74ce7f38',
+    shadowDom: true,
+  };
+</script>
+<script is:inline src="https://app.alivo.ai/Widgets/widget-chat.js" async></script>

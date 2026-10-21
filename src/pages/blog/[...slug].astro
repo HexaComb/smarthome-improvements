@@ -1,0 +1,186 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Breadcrumbs from '../../components/Breadcrumbs.astro';
+import CtaBand from '../../components/CtaBand.astro';
+import Icon from '../../components/Icon.astro';
+import { getCollection, render } from 'astro:content';
+import { site } from '../../data/site';
+import { breadcrumbSchema, faqSchema } from '../../lib/schema';
+import { serviceForCategory, blogCta, costGuides } from '../../data/blogMeta';
+
+export async function getStaticPaths() {
+  const posts = await getCollection('blog');
+  return posts.map((post) => ({ params: { slug: post.id }, props: { post } }));
+}
+
+const { post } = Astro.props;
+const { Content, headings } = await render(post);
+const fmt = (d: Date) =>
+  d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+const service = serviceForCategory(post.data.category);
+const cta = service ? blogCta[service] : null;
+const isCostGuide = costGuides.has(post.id);
+const cslbUrl = `https://www.cslb.ca.gov/OnlineServices/CheckLicenseII/LicenseDetail.aspx?LicNum=${site.license}`;
+
+// Related posts: same category first, newest cross-category to fill (max 3).
+const all = (await getCollection('blog'))
+  .filter((p) => p.id !== post.id)
+  .sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
+const related = [
+  ...all.filter((p) => p.data.category === post.data.category),
+  ...all.filter((p) => p.data.category !== post.data.category),
+].slice(0, 3);
+
+// TOC for long guides: h2 anchors (remark adds ids), plus the FAQ block.
+const toc = headings.filter((h) => h.depth === 2);
+const showToc = toc.length >= 6 || (toc.length >= 4 && post.data.faq.length >= 6);
+
+const crumbs = [
+  { name: 'Home', path: '/' },
+  { name: 'Blog', path: '/blog/' },
+  { name: post.data.title, path: `/blog/${post.id}/` },
+];
+
+const schema: object[] = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BlogPosting',
+    headline: post.data.title,
+    description: post.data.description,
+    datePublished: post.data.date.toISOString(),
+    dateModified: (post.data.updated ?? post.data.date).toISOString(),
+    image: `${site.url}/og-default.jpg`,
+    author: { '@type': 'Organization', name: post.data.author },
+    publisher: { '@id': `${site.url}/#business` },
+    mainEntityOfPage: `${site.url}/blog/${post.id}/`,
+  },
+  breadcrumbSchema(crumbs),
+];
+if (post.data.faq.length > 0) schema.push(faqSchema(post.data.faq));
+---
+
+<Layout
+  title={post.data.title}
+  description={post.data.description}
+  path={`/blog/${post.id}/`}
+  schema={schema}
+>
+  <article class="section">
+    <div class="container-x max-w-3xl">
+      <Breadcrumbs items={crumbs} />
+
+      <span class="mt-6 inline-flex rounded-full bg-navy-50 px-3 py-1 text-xs font-semibold text-navy-700">
+        {post.data.category}
+      </span>
+      <h1 class="mt-4 text-3xl font-display font-bold uppercase leading-tight text-navy-900 sm:text-4xl">
+        {post.data.title}
+      </h1>
+      <p class="mt-3 text-sm text-slate-500">
+        By {post.data.author} · <time datetime={post.data.date.toISOString()}>{fmt(post.data.date)}</time>
+        {post.data.updated && (
+          <span> · Updated <time datetime={post.data.updated.toISOString()}>{fmt(post.data.updated)}</time></span>
+        )}
+      </p>
+
+      {showToc && (
+        <nav aria-label="On this page" class="mt-8 border border-navy-600/20 bg-navy-50 p-5">
+          <p class="kicker text-navy-500">On this page</p>
+          <ol class="mt-3 grid gap-1.5 sm:grid-cols-2">
+            {toc.map((h) => (
+              <li>
+                <a href={`#${h.slug}`} class="text-sm font-medium text-navy-700 hover:text-orange-600">{h.text}</a>
+              </li>
+            ))}
+            {post.data.faq.length > 0 && (
+              <li>
+                <a href="#faq" class="text-sm font-medium text-navy-700 hover:text-orange-600">Frequently asked questions</a>
+              </li>
+            )}
+          </ol>
+        </nav>
+      )}
+
+      <div class="prose-content mt-8">
+        <Content />
+      </div>
+
+      {post.data.faq.length > 0 && (
+        <section id="faq" class="mt-12 scroll-mt-20">
+          <h2 class="font-display text-2xl font-bold uppercase tracking-tight text-navy-900">
+            Frequently asked questions
+          </h2>
+          <div class="mt-5 divide-y divide-navy-600/10 border-y border-navy-600/15">
+            {post.data.faq.map((f) => (
+              <details class="group py-4">
+                <summary class="flex cursor-pointer list-none items-start justify-between gap-4 font-semibold text-navy-800">
+                  {f.q}
+                  <Icon name="arrow" class="mt-1 h-4 w-4 flex-shrink-0 rotate-90 text-orange-500 transition-transform group-open:-rotate-90" />
+                </summary>
+                <p class="mt-2 max-w-prose text-slate-600">{f.a}</p>
+              </details>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <!-- Category-matched CTA (one canonical assessment per service) -->
+      <div class="mt-10 rounded-2xl bg-navy-50 p-6">
+        <h2 class="text-lg font-bold text-navy-900">{cta ? cta.offer : 'Ready to get started?'}</h2>
+        <p class="mt-1 text-slate-600">{cta ? cta.sub : 'Get a free, no-obligation estimate from our licensed team.'}</p>
+        <div class="mt-4 flex flex-col gap-3 sm:flex-row">
+          <a href="/contact/" class="btn-primary">Get a Free Quote</a>
+          <a href={`tel:${site.phoneRaw}`} class="btn-outline">
+            <Icon name="phone" class="h-5 w-5" /> {site.phone}
+          </a>
+        </div>
+        {isCostGuide && (
+          <p class="mt-4 text-sm text-slate-600">
+            Want a number first? <a href="/estimate/" class="font-semibold text-navy-700 underline">See your price range in 60 seconds</a>, no contact info required.
+          </p>
+        )}
+      </div>
+
+      <!-- E-E-A-T author box -->
+      <div class="mt-8 flex items-start gap-4 border border-navy-600/20 bg-white p-5">
+        <img src="/photos/feature/crew-avatar.jpg" alt="Smart Home Improvements crew member on a job in the Central Valley" width="120" height="120" loading="lazy" decoding="async" class="h-14 w-14 flex-shrink-0 object-cover ring-1 ring-navy-200/60" />
+        <div>
+          <p class="font-display text-sm font-bold uppercase tracking-wide text-navy-800">Written by {post.data.author}</p>
+          <p class="mt-1 text-sm text-slate-600">
+            Licensed California contractor, <a href={cslbUrl} target="_blank" rel="noopener" class="font-semibold text-navy-700 underline">CSLB #{site.license}</a>, installing roofing, windows, and insulation across Fresno and the Central Valley since 2014. We do this work every week; the advice here is what we tell our own customers.
+          </p>
+        </div>
+      </div>
+
+      {related.length > 0 && (
+        <section class="mt-10">
+          <h2 class="font-display text-xl font-bold uppercase tracking-tight text-navy-900">Keep reading</h2>
+          <div class="mt-4 divide-y divide-navy-600/10 border-y border-navy-600/15">
+            {related.map((p) => (
+              <a href={`/blog/${p.id}/`} class="group flex items-baseline justify-between gap-4 py-4">
+                <span>
+                  <span class="block font-semibold text-navy-800 group-hover:text-orange-600">{p.data.title}</span>
+                  <span class="mt-0.5 block text-xs text-slate-500">{p.data.category} · {fmt(p.data.date)}</span>
+                </span>
+                <Icon name="arrow" class="h-4 w-4 flex-shrink-0 text-navy-300 transition group-hover:translate-x-1 group-hover:text-orange-500" />
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <div class="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2">
+        <a href="/blog/" class="inline-flex items-center gap-1 font-semibold text-navy-700">
+          <Icon name="arrow" class="h-4 w-4 rotate-180" /> Back to all posts
+        </a>
+        {cta && (
+          <a href={cta.hub} class="inline-flex items-center gap-1 font-semibold text-navy-700 hover:text-orange-600">
+            All {service} services <Icon name="arrow" class="h-4 w-4" />
+          </a>
+        )}
+      </div>
+    </div>
+  </article>
+
+  <CtaBand />
+</Layout>

@@ -1,0 +1,14 @@
+---
+// Anti-bot honeypots for Web3Forms forms.
+//  - `botcheck` is Web3Forms' built-in honeypot: submissions where it is filled
+//    are rejected server-side (custom names are not supported, so keep this name).
+//  - `hp_extra_2` is a second, off-screen trap checked server-side in
+//    /api/lead.ts. The name is deliberately meaningless so browser autofill
+//    heuristics never fill it and silently kill a real lead.
+// Neither field is visible or reachable by keyboard for real users.
+---
+<input type="checkbox" name="botcheck" class="hidden" style="display:none" tabindex="-1" autocomplete="off" aria-hidden="true" />
+<label aria-hidden="true" style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden">
+  Leave this field empty
+  <input type="text" name="hp_extra_2" tabindex="-1" autocomplete="off" />
+</label>

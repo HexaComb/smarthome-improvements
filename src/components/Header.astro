@@ -1,0 +1,288 @@
+---
+import { site, nav } from '../data/site';
+import { cardSrcset } from '../lib/images';
+import { serviceContent } from '../data/serviceContent';
+import Logo from './Logo.astro';
+import Icon from './Icon.astro';
+
+interface Props {
+  /** Where the Free Quote button points; homepage passes "#quote". */
+  ctaHref?: string;
+}
+const { ctaHref = '/contact/' } = Astro.props;
+
+const headerNav = nav.filter((n) => !('footerOnly' in n && n.footerOnly));
+
+const current = Astro.url.pathname;
+const isActive = (href: string) =>
+  href === '/' ? current === '/' : current.startsWith(href);
+
+// Which nav items get a mega menu
+const megaFor = (href: string) => {
+  const slug = href.replace(/\//g, '');
+  return serviceContent[slug] ?? null;
+};
+---
+
+<!-- Top utility bar: value line + hours + tappable phone. Scrolls away; nav sticks. -->
+<div class="hidden bg-navy-950 text-navy-100 lg:block" role="region" aria-label="License, hours, and contact">
+  <div class="container-x flex h-9 items-center justify-between text-xs">
+    <p class="font-semibold uppercase tracking-wide">
+      <span class="text-orange-400">Licensed &amp; insured</span> · <span class="num">CA #{site.license}</span>.
+    </p>
+    <div class="flex items-center gap-5">
+      <span class="num inline-flex items-center gap-1.5">
+        <Icon name="clock" class="h-3.5 w-3.5 text-orange-400" /> Mon-Fri {site.hours[0].time} · Sat {site.hours[1].time}
+      </span>
+      <a href={`sms:${site.smsRaw}`} class="inline-flex items-center gap-1.5 font-semibold hover:text-white">Text us</a>
+      <a href="/es/" lang="es" class="inline-flex items-center gap-1.5 font-semibold text-orange-400 hover:text-white">¿Habla Español?</a>
+      <a href={`tel:${site.phoneRaw}`} class="num inline-flex items-center gap-1.5 font-semibold hover:text-white">
+        <Icon name="phone" class="h-3.5 w-3.5 text-orange-400" /> {site.phone}
+      </a>
+    </div>
+  </div>
+</div>
+
+<header class="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur">
+  <div class="container-x flex h-16 items-center justify-between gap-3 lg:h-20">
+    <a href="/" aria-label="Smart Home Improvements home" class="shrink-0">
+      <Logo variant="color" class="h-9 w-auto lg:h-10 xl:h-11" />
+    </a>
+
+    <nav aria-label="Primary" class="hidden items-center lg:flex">
+      {
+        headerNav.map((item) => {
+          const mega = megaFor(item.href);
+          if (!mega) {
+            return (
+              <a
+                href={item.href}
+                aria-current={isActive(item.href) ? 'page' : undefined}
+                class:list={[
+                  'nav-link rounded-md px-3 py-2 text-[0.9rem] transition hover:text-orange-700 xl:text-[0.95rem]',
+                  isActive(item.href) ? 'text-orange-700 underline decoration-orange-500 decoration-2 underline-offset-8' : 'text-navy-800',
+                ]}
+              >
+                {item.label}
+              </a>
+            );
+          }
+          return (
+            <div class="group relative">
+              <a
+                href={item.href}
+                aria-current={isActive(item.href) ? 'page' : undefined}
+                aria-expanded="false"
+                class:list={[
+                  'nav-link flex items-center gap-1 rounded-md px-3 py-2 text-[0.9rem] transition hover:text-orange-700 xl:text-[0.95rem]',
+                  isActive(item.href) ? 'text-orange-700 underline decoration-orange-500 decoration-2 underline-offset-8' : 'text-navy-800',
+                ]}
+              >
+                {item.label}
+                <svg class="h-4 w-4 transition group-hover:rotate-180" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+                </svg>
+              </a>
+              <!-- Mega panel -->
+              <div class="invisible absolute left-1/2 top-full z-50 w-[min(44rem,calc(100vw-2rem))] -translate-x-1/2 translate-y-1 pt-3 opacity-0 transition duration-150 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100">
+                <div class="overflow-hidden rounded-none bg-white shadow-2xl ring-1 ring-slate-200">
+                  <div class="grid grid-cols-2 gap-3 p-5">
+                    {mega.children.map((c) => (
+                      <a href={`/${mega.slug}/${c.slug}/`} class="flex items-center gap-4 rounded-xl p-3 transition hover:bg-navy-50">
+                        <img src={c.image} srcset={cardSrcset(c.image)} sizes="128px" alt={c.imageAlt} width="176" height="128" loading="lazy" decoding="async" class="h-[5.5rem] w-32 flex-shrink-0 rounded-none object-cover" />
+                        <span class="min-w-0">
+                          <span class="font-display block text-lg font-bold uppercase leading-tight tracking-tight text-navy-700">{c.name}</span>
+                          <span class="mt-1 block text-sm leading-snug text-slate-500">{c.short}</span>
+                        </span>
+                      </a>
+                    ))}
+                  </div>
+                  <a href={item.href} class="flex items-center justify-between gap-2 bg-navy-700 px-6 py-4 text-white transition hover:bg-navy-800">
+                    <span class="font-display text-base font-bold uppercase tracking-wide">
+                      View all {mega.name}
+                    </span>
+                    <Icon name="arrow" class="h-6 w-6" />
+                  </a>
+                </div>
+              </div>
+            </div>
+          );
+        })
+      }
+    </nav>
+
+    <div class="flex items-center gap-3">
+      <a
+        href={`tel:${site.phoneRaw}`}
+        class="hidden items-center gap-2 whitespace-nowrap text-[0.95rem] font-bold text-navy-700 sm:flex lg:hidden xl:flex"
+      >
+        <svg class="h-4 w-4 text-orange-500" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true"
+          ><path
+            d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"
+          ></path></svg
+        >
+        {site.phone}
+      </a>
+      <a
+        href={`tel:${site.phoneRaw}`}
+        class="grid h-10 w-10 place-items-center rounded-md text-orange-500 ring-1 ring-orange-200 sm:hidden"
+        aria-label={`Call ${site.phone}`}
+      >
+        <Icon name="phone" class="h-5 w-5" />
+      </a>
+      <span class="hidden sm:inline-flex">
+        <a href={ctaHref} class="btn-primary whitespace-nowrap !px-5 !py-2.5 text-sm">Free Quote</a>
+      </span>
+      <button
+        id="menu-toggle"
+        class="grid h-10 w-10 place-items-center rounded-md text-navy-700 lg:hidden"
+        aria-label="Toggle menu"
+        aria-expanded="false"
+        aria-controls="mobile-nav"
+      >
+        <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
+          ><path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16"></path></svg
+        >
+      </button>
+    </div>
+  </div>
+
+  <!-- Mobile -->
+  <nav
+    id="mobile-nav"
+    aria-label="Mobile"
+    class="hidden max-h-[80vh] overflow-y-auto border-t border-slate-200 bg-white lg:hidden"
+  >
+    <div class="container-x flex flex-col py-3">
+      {
+        headerNav.map((item) => {
+          const mega = megaFor(item.href);
+          if (!mega) {
+            return (
+              <a
+                href={item.href}
+                class:list={[
+                  'nav-link rounded-md px-3 py-3 text-base',
+                  isActive(item.href) ? 'text-orange-700' : 'text-navy-700',
+                ]}
+              >
+                {item.label}
+              </a>
+            );
+          }
+          return (
+            <details class="border-b border-slate-100 last:border-0">
+              <summary class="nav-link flex cursor-pointer list-none items-center justify-between px-3 py-3 text-base text-navy-700">
+                {item.label}
+                <svg class="h-4 w-4 text-navy-400 transition" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" /></svg>
+              </summary>
+              <div class="pb-2 pl-3">
+                <a href={item.href} class="block rounded-md px-3 py-2 text-sm font-semibold text-navy-700">
+                  All {mega.name}
+                </a>
+                {mega.children.map((c) => (
+                  <a href={`/${mega.slug}/${c.slug}/`} class="block rounded-md px-3 py-2 text-sm text-slate-600">
+                    {c.name}
+                  </a>
+                ))}
+              </div>
+            </details>
+          );
+        })
+      }
+      <a href={`tel:${site.phoneRaw}`} class="mt-3 btn-outline">Call {site.phone}</a>
+    </div>
+  </nav>
+</header>
+
+<script>
+  const btn = document.getElementById('menu-toggle');
+  const menu = document.getElementById('mobile-nav');
+  btn?.addEventListener('click', () => {
+    const open = menu?.classList.toggle('hidden') === false;
+    btn.setAttribute('aria-expanded', String(open));
+  });
+
+  // Mega menu a11y (all devices): keep aria-expanded on the trigger in sync
+  // with the CSS hover/focus-within state, and let Escape close the panel and
+  // hand focus back to the trigger. Escape hides the panel with inline styles
+  // (cleared when the pointer or keyboard focus leaves the group) because the
+  // trigger itself keeps :focus-within alive.
+  const megaGroups = Array.from(document.querySelectorAll('nav[aria-label="Primary"] .group'));
+  megaGroups.forEach((g) => {
+    const trigger = g.querySelector('a');
+    const panel = g.querySelector<HTMLElement>(':scope > div');
+    if (!trigger) return;
+    const expanded = (open: boolean) => trigger.setAttribute('aria-expanded', String(open));
+    const unhide = () => {
+      if (panel) {
+        panel.style.visibility = '';
+        panel.style.opacity = '';
+      }
+    };
+    g.addEventListener('mouseenter', () => {
+      unhide();
+      expanded(true);
+    });
+    g.addEventListener('mouseleave', () => {
+      unhide();
+      if (!g.classList.contains('open')) expanded(false);
+    });
+    g.addEventListener('focusin', () => {
+      if (!panel || panel.style.visibility !== 'hidden') expanded(true);
+    });
+    g.addEventListener('focusout', () => {
+      requestAnimationFrame(() => {
+        if (!g.contains(document.activeElement)) {
+          unhide();
+          if (!g.classList.contains('open')) expanded(false);
+        }
+      });
+    });
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    const g = megaGroups.find((x) => x.contains(document.activeElement));
+    if (!g) return;
+    const trigger = g.querySelector('a');
+    const panel = g.querySelector<HTMLElement>(':scope > div');
+    if (panel) {
+      panel.style.visibility = 'hidden';
+      panel.style.opacity = '0';
+    }
+    g.classList.remove('open');
+    trigger?.setAttribute('aria-expanded', 'false');
+    trigger?.focus();
+  });
+
+  // Touch support for the desktop-width mega menu (iPads): hover cannot open
+  // it, so the first tap opens the panel and the second tap follows the link.
+  if (window.matchMedia('(hover: none)').matches) {
+    const groups = Array.from(document.querySelectorAll('nav[aria-label="Primary"] .group'));
+    const closeAll = (except?: Element) =>
+      groups.forEach((g) => {
+        if (g !== except) {
+          g.classList.remove('open');
+          g.querySelector('a')?.setAttribute('aria-expanded', 'false');
+        }
+      });
+    groups.forEach((g) => {
+      const trigger = g.querySelector('a');
+      trigger?.setAttribute('aria-expanded', 'false');
+      trigger?.addEventListener('click', (e) => {
+        if (!g.classList.contains('open')) {
+          e.preventDefault();
+          closeAll(g);
+          g.classList.add('open');
+          trigger.setAttribute('aria-expanded', 'true');
+        }
+      });
+    });
+    document.addEventListener('click', (e) => {
+      if (!groups.some((g) => g.contains(e.target as Node))) closeAll();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeAll();
+    });
+  }
+</script>

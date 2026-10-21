@@ -1,0 +1,125 @@
+---
+// Interactive isometric home: hover/tap a hotspot to reveal what we do for
+// that part of the house. Works with hover (desktop), focus (keyboard), and
+// tap (touch, via the small inline script).
+import Icon from './Icon.astro';
+
+interface Props {
+  src?: string;
+  alt?: string;
+}
+const {
+  src = '/illustrations/home-hero.svg',
+  alt = 'Interactive isometric illustration of a Central Valley home: roof, windows, and insulation',
+} = Astro.props;
+
+// x/y are percentages over the illustration; `place` controls which side the card opens.
+const hotspots = [
+  { key: 'roofing', x: 57, y: 26, icon: 'roof', name: 'Roofing', text: 'Architectural shingle, metal, and tile roofs built for Central Valley heat and sun.', href: '/roofing/', place: 'right' },
+  { key: 'insulation', x: 41, y: 41, icon: 'insulation', name: 'Insulation', text: 'Attic insulation and radiant barriers that keep heat out and cut energy bills.', href: '/insulation/', place: 'right' },
+  { key: 'windows', x: 33, y: 55, icon: 'window', name: 'Windows', text: 'Energy-efficient replacement windows that lower bills, block noise, and add curb appeal.', href: '/windows/', place: 'right' },
+];
+---
+
+<div class="ih relative mx-auto w-full max-w-2xl" data-interactive-home>
+  <div class="pointer-events-none absolute left-1/2 top-1/2 h-3/4 w-3/4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-navy-200/20 blur-3xl"></div>
+  <img src={src} alt={alt} width="1320" height="1040" fetchpriority="high" decoding="async" class="relative w-full drop-shadow-2xl" />
+
+  {hotspots.map((h) => (
+    <div class="ih-spot" style={`left:${h.x}%;top:${h.y}%`} data-spot data-place={h.place}>
+      <button type="button" class="ih-dot" data-spot-btn aria-expanded="false" aria-label={`${h.name}: ${h.text}`}>
+        <span class="ih-ping" aria-hidden="true"></span>
+        <span class="ih-core" aria-hidden="true"></span>
+      </button>
+      <div class="ih-card" role="group" aria-label={h.name}>
+        <span class="ih-card-icon"><Icon name={h.icon} class="h-5 w-5" /></span>
+        <div>
+          <p class="font-display text-base font-bold uppercase tracking-tight text-navy-700">{h.name}</p>
+          <p class="mt-1 text-sm leading-snug text-slate-600">{h.text}</p>
+          <a href={h.href} class="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-orange-600 hover:text-orange-700">
+            Explore {h.name.toLowerCase()} <Icon name="arrow" class="h-4 w-4" />
+          </a>
+        </div>
+      </div>
+    </div>
+  ))}
+
+  <p class="ih-hint" aria-hidden="true">
+    <span class="ih-hint-dot"></span> Hover the markers to see what we do
+  </p>
+</div>
+
+<style>
+  .ih-spot { position: absolute; transform: translate(-50%, -50%); z-index: 10; }
+  .ih-dot {
+    position: relative; display: grid; place-items: center;
+    height: 2.25rem; width: 2.25rem; border-radius: 9999px; cursor: pointer;
+    background: transparent; border: 0;
+  }
+  .ih-core {
+    height: 1rem; width: 1rem; border-radius: 9999px; background: var(--color-orange-500);
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.9), 0 4px 12px rgba(14, 29, 51, 0.45);
+    transition: transform 0.2s ease;
+  }
+  .ih-ping {
+    position: absolute; height: 1rem; width: 1rem; border-radius: 9999px;
+    background: var(--color-orange-500); opacity: 0.6; animation: ih-ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+  }
+  @keyframes ih-ping { 75%, 100% { transform: scale(2.6); opacity: 0; } }
+  .ih-dot:hover .ih-core, .ih-dot:focus-visible .ih-core { transform: scale(1.25); }
+  .ih-dot:focus-visible { outline: 2px solid var(--color-orange-500); outline-offset: 3px; }
+
+  .ih-card {
+    position: absolute; top: 50%; width: 16rem; transform: translateY(-50%) scale(0.96);
+    background: #fff; border-radius: 0.85rem; padding: 0.9rem 1rem;
+    box-shadow: 0 18px 45px rgba(14, 29, 51, 0.28); border: 1px solid rgba(15, 23, 42, 0.06);
+    display: flex; gap: 0.75rem; opacity: 0; pointer-events: none;
+    transition: opacity 0.18s ease, transform 0.18s ease; z-index: 20;
+  }
+  .ih-spot[data-place='right'] .ih-card { left: 2.75rem; transform-origin: left center; }
+  .ih-spot[data-place='left'] .ih-card { right: 2.75rem; transform-origin: right center; }
+  .ih-card-icon {
+    display: grid; place-items: center; height: 2.25rem; width: 2.25rem; flex: none;
+    border-radius: 0.6rem; background: var(--color-navy-50); color: var(--color-navy-600);
+  }
+  .ih-spot:hover .ih-card,
+  .ih-spot:focus-within .ih-card,
+  .ih-spot.is-open .ih-card {
+    opacity: 1; pointer-events: auto; transform: translateY(-50%) scale(1);
+  }
+
+  .ih-hint {
+    position: absolute; bottom: 0.5rem; left: 50%; transform: translateX(-50%);
+    display: inline-flex; align-items: center; gap: 0.5rem; white-space: nowrap;
+    font-size: 0.78rem; font-weight: 600; color: var(--color-navy-100);
+    background: rgba(14, 29, 51, 0.55); padding: 0.35rem 0.8rem; border-radius: 9999px;
+    backdrop-filter: blur(4px);
+  }
+  .ih-hint-dot { height: 0.5rem; width: 0.5rem; border-radius: 9999px; background: var(--color-orange-500); }
+  .ih:focus-within .ih-hint, .ih.ih-touched .ih-hint { opacity: 0; transition: opacity 0.3s ease; }
+
+  @media (max-width: 380px) { .ih-card { width: 13rem; } }
+  @media (prefers-reduced-motion: reduce) { .ih-ping { animation: none; } }
+</style>
+
+<script is:inline>
+  (function () {
+    document.querySelectorAll('[data-interactive-home]').forEach(function (root) {
+      var spots = root.querySelectorAll('[data-spot]');
+      spots.forEach(function (spot) {
+        var btn = spot.querySelector('[data-spot-btn]');
+        if (!btn) return;
+        btn.addEventListener('click', function (e) {
+          e.preventDefault();
+          var isOpen = spot.classList.contains('is-open');
+          spots.forEach(function (s) { s.classList.remove('is-open'); s.querySelector('[data-spot-btn]').setAttribute('aria-expanded', 'false'); });
+          if (!isOpen) { spot.classList.add('is-open'); btn.setAttribute('aria-expanded', 'true'); }
+          root.classList.add('ih-touched');
+        });
+      });
+      document.addEventListener('click', function (e) {
+        if (!root.contains(e.target)) spots.forEach(function (s) { s.classList.remove('is-open'); });
+      });
+    });
+  })();
+</script>

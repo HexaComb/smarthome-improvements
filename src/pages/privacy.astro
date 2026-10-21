@@ -1,0 +1,78 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { site } from '../data/site';
+const updated = 'July 2026';
+---
+
+<Layout
+  title="Privacy Policy"
+  description="Privacy policy for Smart Home Improvements describing how we collect and use information submitted through our website."
+  path="/privacy/"
+>
+  <section class="section">
+    <div class="container-x max-w-3xl">
+      <h1 class="text-3xl font-display font-bold uppercase text-navy-900">Privacy Policy</h1>
+      <p class="mt-2 text-sm text-slate-500">Last updated: {updated}</p>
+
+      <div class="prose-content mt-8">
+        <p>
+          Smart Home Improvements ("we," "us," or "our") respects your privacy. This policy explains
+          what information we collect through {site.url} and how we use it.
+        </p>
+
+        <h2>Information we collect</h2>
+        <p>
+          When you submit our contact or estimate form, we collect the information you provide,
+          such as your name, phone number, email address, property address, and project details.
+          We may also collect basic, non-identifying analytics about how visitors use our site.
+        </p>
+
+        <h2>How we use your information</h2>
+        <ul>
+          <li>To respond to your inquiry and provide estimates or services.</li>
+          <li>To contact you about your project by phone, text, or email.</li>
+          <li>To improve our website and services.</li>
+        </ul>
+
+        <h2>Text messaging (SMS) and phone consent</h2>
+        <p>
+          When you submit a form on our website and provide a phone number, you consent to receive
+          calls and text messages (SMS) from Smart Home Improvements about your inquiry, estimate,
+          appointments, and related service updates, including messages sent through automated
+          technology. Consent to receive texts is not a condition of purchase. Message frequency
+          varies and message and data rates may apply. Reply STOP to any message to opt out, or
+          HELP for help. Full program terms are in our
+          <a href="/terms/" class="text-navy-700 underline">Terms of Service</a>.
+        </p>
+        <p>
+          <strong>
+            No mobile information will be shared with third parties or affiliates for marketing or
+            promotional purposes. Text messaging originator opt-in data and consent will not be
+            shared with any third parties.
+          </strong>
+        </p>
+
+        <h2>Sharing</h2>
+        <p>
+          We do not sell your personal information. We only share it with trusted service providers
+          who help us operate our business (for example, form delivery, customer relationship
+          management, and call tracking), and only so they can perform those services for us, or
+          when required by law.
+        </p>
+
+        <h2>Your choices</h2>
+        <p>
+          You may request that we update or delete your information, or stop contacting you, at any
+          time by emailing <a href={`mailto:${site.email}`} class="text-navy-700 underline">{site.email}</a>
+          or calling <a href={`tel:${site.phoneRaw}`} class="text-navy-700 underline">{site.phone}</a>.
+        </p>
+
+        <h2>Contact</h2>
+        <p>
+          Questions about this policy? Reach us at {site.email} or {site.phone}. Smart Home
+          Improvements, {site.city}, {site.region}. CA License #{site.license}.
+        </p>
+      </div>
+    </div>
+  </section>
+</Layout>

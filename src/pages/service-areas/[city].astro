@@ -1,0 +1,171 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { cardSrcset } from '../../lib/images';
+import Icon from '../../components/Icon.astro';
+import PageHero from '../../components/PageHero.astro';
+import FeatureRow from '../../components/FeatureRow.astro';
+import ProcessSteps from '../../components/ProcessSteps.astro';
+import Reviews from '../../components/Reviews.astro';
+import Guarantee from '../../components/Guarantee.astro';
+import CtaBand from '../../components/CtaBand.astro';
+import ProjectStrip from '../../components/ProjectStrip.astro';
+import { site } from '../../data/site';
+import { areas } from '../../data/areas';
+import { services } from '../../data/serviceContent';
+import { projects } from '../../data/projects';
+import { breadcrumbSchema } from '../../lib/schema';
+
+export function getStaticPaths() {
+  return areas.map((a) => ({ params: { city: a.slug }, props: { area: a } }));
+}
+
+const { area } = Astro.props;
+const path = `/service-areas/${area.slug}/`;
+const crumbs = [
+  { name: 'Home', path: '/' },
+  { name: 'Service Areas', path: '/service-areas/' },
+  { name: area.city, path },
+];
+
+// Real completed projects in this city (the proof no template city page has).
+const cityProjects = projects.filter((p) => p.city === `${area.city}, CA`).slice(0, 3);
+
+const faqs = [
+  {
+    q: `Do you serve ${area.city}, CA?`,
+    a: `Yes. ${area.city} is part of our ${area.core ? 'core' : 'Central Valley'} service area. We provide roofing, window, and insulation services throughout ${area.city} and ${area.county}. Call ${site.phone} for a free estimate.`,
+  },
+  {
+    q: `What roofing holds up best in ${area.city}'s climate?`,
+    a: `${area.city} summers are hot and dry. We install asphalt shingle, metal, and tile roofs chosen to handle the heat and sun, and we help you pick the right fit for your home and budget.`,
+  },
+  {
+    q: `Do you offer free estimates in ${area.city}?`,
+    a: `Yes. Every estimate is free and no-obligation. Call ${site.phone} or request a quote online and we will get right back to you.`,
+  },
+  ...(area.faq ?? []),
+];
+
+const schema = [
+  breadcrumbSchema(crumbs),
+  {
+    '@context': 'https://schema.org',
+    '@type': 'Service',
+    serviceType: 'Roofing, windows, and insulation',
+    name: `Home improvement services in ${area.city}, ${site.region}`,
+    description: area.metaDescription,
+    url: new URL(path, site.url).href,
+    provider: { '@id': `${site.url}/#business` },
+    areaServed: { '@type': 'City', name: `${area.city}, ${site.region}` },
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faqs.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })),
+  },
+];
+---
+
+<Layout title={area.metaTitle} description={area.metaDescription} path={path} image={area.image} schema={schema}>
+  <PageHero
+    image={area.image}
+    imageAlt={area.imageAlt}
+    crumbs={crumbs}
+    kicker={`Serving ${area.city}, ${site.region}`}
+    title={`Roofing, Windows & Insulation in ${area.city}`}
+    intro={area.intro}
+    bullets={['Free estimates', 'Licensed CA #' + site.license, `${site.yearsInBusiness}+ years local`]}
+    eager={true}
+  >
+    <a href="/contact/" class="btn-primary">Get a Free Estimate</a>
+    <a href={`tel:${site.phoneRaw}`} class="btn-secondary">
+      <Icon name="phone" class="h-5 w-5" /> {site.phone}
+    </a>
+  </PageHero>
+
+  <!-- Local intro -->
+  <FeatureRow
+    eyebrow={`Your local ${area.city} contractor`}
+    title={`Home improvement built for ${area.city}`}
+    image="/photos/feature/crew.jpg"
+    imageAlt={`Smart Home Improvements crew working in the ${area.city}, CA area`}
+    tone="light"
+    cta={{ href: '/contact/', label: 'Request a Free Quote' }}
+  >
+    <p>{area.localNote}</p>
+  </FeatureRow>
+
+  <!-- Services in this city -->
+  <section class="section bg-slate-50">
+    <div class="container-x">
+      <div class="mx-auto max-w-2xl text-center">
+        <p class="kicker text-orange-700">What we do in {area.city}</p>
+        <h2 class="mt-2 h-section">Our {area.city} services</h2>
+      </div>
+      <div class="mt-12 grid gap-6 lg:grid-cols-3">
+        {
+          services.map((s) => (
+            <a href={`/${s.slug}/`} class="group flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 transition hover:shadow-lg">
+              <div class="relative aspect-[16/10] overflow-hidden">
+                <img src={s.image} srcset={cardSrcset(s.image)} sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 92vw" alt={s.imageAlt} width="1400" height="1050" loading="lazy" decoding="async" class="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+                <span class="absolute bottom-3 left-3 grid h-11 w-11 place-items-center rounded-xl bg-orange-500 text-white shadow-lg">
+                  <Icon name={s.icon} class="h-6 w-6" />
+                </span>
+              </div>
+              <div class="flex flex-1 flex-col p-6">
+                <h3 class="font-display text-xl font-bold uppercase tracking-tight text-navy-700">{s.name} in {area.city}</h3>
+                <p class="mt-2 flex-1 text-slate-600">{s.summary}</p>
+                <span class="mt-4 inline-flex items-center gap-1 font-semibold text-navy-700 group-hover:text-orange-600">
+                  Learn more <Icon name="arrow" class="h-4 w-4 transition group-hover:translate-x-1" />
+                </span>
+              </div>
+            </a>
+          ))
+        }
+      </div>
+      {
+        area.neighborhoods.length > 0 && (
+          <p class="mt-10 text-center text-sm text-slate-500">
+            Proudly serving {area.neighborhoods.join(', ')}, and the rest of {area.city}.
+          </p>
+        )
+      }
+    </div>
+  </section>
+
+  {cityProjects.length > 0 && (
+    <ProjectStrip
+      items={cityProjects}
+      eyebrow={`Real work in ${area.city}`}
+      heading={`Completed ${area.city} projects`}
+    />
+  )}
+
+  <ProcessSteps heading={`How we work in ${area.city}`} image={area.image} imageAlt={area.imageAlt} />
+
+  <Reviews />
+
+  <Guarantee />
+
+  <!-- FAQ -->
+  <section class="section">
+    <div class="container-x max-w-3xl">
+      <h2 class="h-section text-center">{area.city} questions, answered</h2>
+      <div class="mt-10 divide-y divide-slate-200 rounded-2xl border border-slate-200">
+        {
+          faqs.map((f) => (
+            <details class="group p-5">
+              <summary class="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold text-navy-900">
+                {f.q}
+                <Icon name="arrow" class="h-5 w-5 flex-shrink-0 text-navy-500 transition group-open:rotate-90" />
+              </summary>
+              <p class="mt-3 text-slate-600">{f.a}</p>
+            </details>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <CtaBand heading={`Get your free estimate in ${area.city}`} image={area.image} />
+</Layout>

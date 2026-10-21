@@ -1,0 +1,28 @@
+---
+// Brand logo. Uses the official vector lockup extracted from the brand guide.
+// variant: "color" (orange mark + navy text, for light backgrounds)
+//          "white" (all white, for navy/dark backgrounds)
+//          "mark"  (icon only, inherits currentColor)
+interface Props {
+  variant?: 'color' | 'white' | 'mark';
+  class?: string;
+}
+const { variant = 'color', class: cls = 'h-9 w-auto' } = Astro.props;
+
+const src =
+  variant === 'white'
+    ? '/brand/lockup-white.svg'
+    : variant === 'mark'
+      ? '/brand/mark.svg'
+      : '/brand/lockup-color.svg';
+---
+
+<img
+  src={src}
+  alt="Smart Home Improvements"
+  class={cls}
+  width="658"
+  height={variant === 'mark' ? 657 : 150}
+  loading="eager"
+  decoding="async"
+/>

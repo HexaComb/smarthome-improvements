@@ -1,0 +1,92 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { cardSrcset } from '../../lib/images';
+import Icon from '../../components/Icon.astro';
+import PageHero from '../../components/PageHero.astro';
+import CtaBand from '../../components/CtaBand.astro';
+import { site } from '../../data/site';
+import { areas } from '../../data/areas';
+import { breadcrumbSchema } from '../../lib/schema';
+
+const crumbs = [
+  { name: 'Home', path: '/' },
+  { name: 'Service Areas', path: '/service-areas/' },
+];
+const schema = [
+  breadcrumbSchema(crumbs),
+  {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: 'Smart Home Improvements service areas',
+    itemListElement: areas.map((a, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      name: `${a.city}, ${site.region}`,
+      url: new URL(`/service-areas/${a.slug}/`, site.url).href,
+    })),
+  },
+];
+---
+
+<Layout
+  title="Service Areas | Roofing, Windows & Insulation in the Central Valley"
+  description="Smart Home Improvements serves Fresno, Clovis, Madera, Visalia, and the surrounding Central Valley with roofing, window, and insulation services. Licensed CA #1129883."
+  path="/service-areas/"
+  image={areas[0].image}
+  schema={schema}
+>
+  <PageHero
+    image="/photos/hero/projects.jpg"
+    imageAlt="Isometric illustration of a Central Valley home with a location pin"
+    illustration="/illustrations/contact.svg"
+    crumbs={crumbs}
+    kicker="Service Areas"
+    title="Serving Fresno & the Central Valley"
+    intro="We are a local, licensed contractor bringing quality roofing, windows, and insulation to homeowners across the Central Valley. Find your city below."
+    eager={true}
+  >
+    <a href="/contact/" class="btn-primary">Get a Free Quote</a>
+    <a href={`tel:${site.phoneRaw}`} class="btn-secondary">
+      <Icon name="phone" class="h-5 w-5" /> {site.phone}
+    </a>
+  </PageHero>
+
+  <section class="section">
+    <div class="container-x">
+      <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {
+          areas.map((a) => (
+            <a href={`/service-areas/${a.slug}/`} class="group flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 transition hover:shadow-lg">
+              <div class="relative aspect-[16/10] overflow-hidden">
+                <img src={a.image} srcset={cardSrcset(a.image)} sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 92vw" alt={a.imageAlt} width="1400" height="1050" loading="lazy" decoding="async" class="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+                <div class="absolute inset-0 bg-gradient-to-t from-navy-900/80 to-transparent" />
+                <h2 class="font-display absolute bottom-3 left-4 text-2xl font-bold uppercase tracking-tight text-white">
+                  {a.city}
+                </h2>
+                {a.core && (
+                  <span class="absolute right-3 top-3 rounded-full bg-orange-500 px-3 py-0.5 text-xs font-semibold uppercase tracking-wide text-white">
+                    Core area
+                  </span>
+                )}
+              </div>
+              <div class="flex flex-1 flex-col p-6">
+                <p class="text-sm text-slate-500">{a.county}</p>
+                <p class="mt-1 flex-1 text-slate-600">{a.blurb}</p>
+                <span class="mt-4 inline-flex items-center gap-1 font-semibold text-navy-700 group-hover:text-orange-600">
+                  {a.city} services <Icon name="arrow" class="h-4 w-4 transition group-hover:translate-x-1" />
+                </span>
+              </div>
+            </a>
+          ))
+        }
+      </div>
+      <p class="mt-10 text-center text-slate-600">
+        Do not see your town? We serve much of the Central Valley. Call
+        <a href={`tel:${site.phoneRaw}`} class="font-semibold text-navy-700 underline decoration-orange-400">{site.phone}</a>
+        and ask.
+      </p>
+    </div>
+  </section>
+
+  <CtaBand image="/photos/hero/home-hero.jpg" />
+</Layout>

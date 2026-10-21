@@ -1,0 +1,15 @@
+---
+import ServiceHub from '../../components/ServiceHub.astro';
+import { serviceContent } from '../../data/serviceContent';
+
+export function getStaticPaths() {
+  return Object.values(serviceContent).map((s) => ({
+    params: { service: s.slug },
+    props: { data: s },
+  }));
+}
+
+const { data } = Astro.props;
+---
+
+<ServiceHub data={data} />

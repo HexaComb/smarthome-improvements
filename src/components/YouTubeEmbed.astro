@@ -1,0 +1,52 @@
+---
+interface Props {
+  id: string;
+  title: string;
+  vertical?: boolean; // Shorts are vertical (9:16)
+  class?: string;
+}
+const { id, title, vertical = true, class: cls = '' } = Astro.props;
+const thumb = `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
+---
+
+<div
+  class:list={['yt-facade group relative overflow-hidden rounded-2xl bg-black shadow-xl ring-1 ring-black/10', vertical ? 'aspect-[9/16]' : 'aspect-video', cls]}
+  data-yt-id={id}
+  data-yt-title={title}
+>
+  <button type="button" class="yt-play absolute inset-0 h-full w-full cursor-pointer" aria-label={`Play video: ${title}`}>
+    <img src={thumb} alt="" loading="lazy" decoding="async" class="absolute inset-0 h-full w-full object-cover opacity-90 transition group-hover:opacity-100" />
+    <span class="absolute inset-0 bg-gradient-to-t from-navy-900/70 via-transparent to-transparent"></span>
+    <span class="absolute left-1/2 top-1/2 grid h-16 w-16 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-orange-500 text-white shadow-lg transition group-hover:scale-110">
+      <svg class="ml-1 h-7 w-7" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
+    </span>
+    <span class="font-display absolute inset-x-0 bottom-0 p-4 text-left text-sm font-semibold uppercase tracking-wide text-white">{title}</span>
+  </button>
+</div>
+
+<script>
+  function initYt() {
+    document.querySelectorAll('.yt-facade').forEach((el) => {
+      const root = el as HTMLElement;
+      if (root.dataset.ytReady) return;
+      root.dataset.ytReady = '1';
+      const btn = root.querySelector('.yt-play');
+      btn?.addEventListener('click', () => {
+        const id = root.dataset.ytId;
+        const title = root.dataset.ytTitle ?? 'YouTube video';
+        const iframe = document.createElement('iframe');
+        iframe.src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&playsinline=1`;
+        iframe.title = title;
+        iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
+        iframe.setAttribute('allowfullscreen', '');
+        iframe.className = 'absolute inset-0 h-full w-full';
+        root.innerHTML = '';
+        root.appendChild(iframe);
+        // The play button just got removed; keep keyboard focus in place.
+        iframe.focus();
+      });
+    });
+  }
+  initYt();
+  document.addEventListener('astro:after-swap', initYt);
+</script>

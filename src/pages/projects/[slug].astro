@@ -1,0 +1,131 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Icon from '../../components/Icon.astro';
+import PageHero from '../../components/PageHero.astro';
+import BeforeAfter from '../../components/BeforeAfter.astro';
+import PhotoGallery from '../../components/PhotoGallery.astro';
+import Guarantee from '../../components/Guarantee.astro';
+import CtaBand from '../../components/CtaBand.astro';
+import { site } from '../../data/site';
+import { caseStudies } from '../../data/caseStudies';
+import { serviceContent } from '../../data/serviceContent';
+import { breadcrumbSchema } from '../../lib/schema';
+
+export function getStaticPaths() {
+  return caseStudies.map((c) => ({ params: { slug: c.slug }, props: { study: c } }));
+}
+
+const { study } = Astro.props;
+const path = `/projects/${study.slug}/`;
+const svc = serviceContent[study.service];
+const crumbs = [
+  { name: 'Home', path: '/' },
+  { name: 'Projects', path: '/projects/' },
+  { name: study.title, path },
+];
+const story = [
+  { label: 'The challenge', text: study.challenge },
+  { label: 'What we did', text: study.solution },
+  { label: 'The result', text: study.result },
+];
+const schema = [
+  breadcrumbSchema(crumbs),
+  {
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: study.title,
+    description: study.metaDescription,
+    image: new URL(study.image, site.url).href,
+    author: { '@id': `${site.url}/#business` },
+    publisher: { '@id': `${site.url}/#business` },
+    mainEntityOfPage: new URL(path, site.url).href,
+  },
+];
+---
+
+<Layout title={study.metaTitle} description={study.metaDescription} path={path} image={study.image} schema={schema}>
+  <PageHero
+    image={study.image}
+    imageAlt={study.imageAlt}
+    crumbs={crumbs}
+    kicker={`${svc.name} case study in ${study.city}`}
+    title={study.title}
+    intro={study.summary}
+    bullets={[`${study.city}`, `Licensed CA #${site.license}`, 'Free estimates']}
+    eager={true}
+  >
+    <a href="/contact/" class="btn-primary">Get a Free Quote</a>
+    <a href={`tel:${site.phoneRaw}`} class="btn-secondary">
+      <Icon name="phone" class="h-5 w-5" /> {site.phone}
+    </a>
+  </PageHero>
+
+  <BeforeAfter
+    before={study.before}
+    after={study.after}
+    beforeAlt={study.beforeAlt ?? `Before: ${study.title.toLowerCase()} in ${study.city}`}
+    afterAlt={study.afterAlt ?? `After: finished ${svc.name.toLowerCase()} work in ${study.city}`}
+    heading="Before and after"
+    sub="Drag the slider to see the transformation on this job."
+  />
+
+  <!-- Story -->
+  <section class="section">
+    <div class="container-x grid gap-12 lg:grid-cols-3">
+      <div class="lg:col-span-2 space-y-8">
+        {
+          story.map((s) => (
+            <div>
+              <h2 class="font-display text-2xl font-bold uppercase tracking-tight text-navy-700">{s.label}</h2>
+              <p class="mt-3 leading-relaxed text-slate-700">{s.text}</p>
+            </div>
+          ))
+        }
+        <a href="/contact/" class="btn-primary">Start your project</a>
+      </div>
+      <aside class="lg:col-span-1">
+        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-6">
+          <h2 class="font-display text-lg font-bold uppercase tracking-tight text-navy-700">Project highlights</h2>
+          <ul class="mt-4 space-y-3">
+            {
+              study.highlights.map((h) => (
+                <li class="flex items-start gap-3 text-slate-700">
+                  <Icon name="check" class="mt-0.5 h-5 w-5 flex-shrink-0 text-orange-500" />
+                  <span>{h}</span>
+                </li>
+              ))
+            }
+          </ul>
+          <div class="mt-6 rounded-xl bg-navy-700 p-4 text-center text-white">
+            <p class="text-sm text-navy-100">Service</p>
+            <a href={`/${svc.slug}/`} class="font-display mt-1 block text-xl font-bold uppercase">{svc.name}</a>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <PhotoGallery items={study.gallery} tone="muted" heading="Project photos" eyebrow="On the job" />
+
+  {
+    study.testimonial && (
+      <section class="bg-navy-900 py-16 text-white sm:py-20">
+        <div class="container-x max-w-3xl text-center">
+          <div class="flex justify-center text-orange-400" aria-hidden="true">
+            {Array.from({ length: 5 }).map(() => <Icon name="star" class="h-6 w-6" />)}
+          </div>
+          <blockquote class="font-display mt-6 text-2xl font-medium leading-snug sm:text-3xl">
+            “{study.testimonial.text}”
+          </blockquote>
+          <p class="mt-4 text-navy-100">
+            {study.testimonial.name}, {study.testimonial.city}
+          </p>
+        </div>
+      </section>
+    )
+  }
+
+  <Guarantee />
+
+  <CtaBand heading={`Want results like this?`} image={study.image} />
+</Layout>

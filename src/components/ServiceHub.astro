@@ -1,0 +1,454 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Icon from './Icon.astro';
+import Breadcrumbs from './Breadcrumbs.astro';
+import Reviews from './Reviews.astro';
+import CtaBand from './CtaBand.astro';
+import FeatureRow from './FeatureRow.astro';
+import Guarantee from './Guarantee.astro';
+import ProcessSteps from './ProcessSteps.astro';
+import Honeypot from './Honeypot.astro';
+import FormConsent from './FormConsent.astro';
+import ServiceAreas from './ServiceAreas.astro';
+import AreaLinks from './AreaLinks.astro';
+import VideoGallery from './VideoGallery.astro';
+import PhotoGallery from './PhotoGallery.astro';
+import ProjectStrip from './ProjectStrip.astro';
+import SectionHead from './SectionHead.astro';
+import { site, services as navServices } from '../data/site';
+import { webpSrcset, cardSrcset } from '../lib/images';
+import { projectsByService } from '../data/projects';
+import { videosFor, localVsl } from '../data/videos';
+import { galleryByService } from '../data/gallery';
+import { caseStudiesFor } from '../data/caseStudies';
+import { breadcrumbSchema, faqSchema, serviceSchema, itemListSchema } from '../lib/schema';
+import NamedSystem from './NamedSystem.astro';
+import PromiseBand from './PromiseBand.astro';
+import ResourceLinks from './ResourceLinks.astro';
+import type { ServiceSlug } from '../data/blogMeta';
+import { offerFor, adServices, type AdService } from '../data/landing';
+import type { ServiceContent } from '../data/serviceContent';
+
+interface Props {
+  data: ServiceContent;
+}
+const { data } = Astro.props;
+const others = navServices.filter((s) => s.slug !== data.slug);
+const path = `/${data.slug}/`;
+const proj = projectsByService(data.slug).slice(0, 3);
+const vids = videosFor(data.slug);
+const vsl = localVsl[data.slug as keyof typeof localVsl];
+const gallery = galleryByService[data.slug] ?? [];
+const studies = caseStudiesFor(data.slug);
+
+const formReady = site.formAccessKey.length > 0;
+
+const crumbs = [
+  { name: 'Home', path: '/' },
+  { name: data.name, path },
+];
+
+const heroBullets = ['Free estimates', 'Fast, responsive scheduling', 'Licensed & experienced'];
+
+const approach = [
+  { icon: 'check', title: 'Free, thorough inspection', text: 'We assess your home and document what we find with photos, so you know exactly what is going on and why.' },
+  { icon: 'shield', title: 'Honest recommendations', text: 'We tell you whether a repair or a replacement makes more sense for your home and your budget. No pressure.' },
+  { icon: 'clock', title: 'Clean, on-time work', text: 'Licensed crews, clear timelines, tidy job sites, and upfront pricing with no surprises.' },
+];
+
+const freeOffer = (adServices as readonly string[]).includes(data.slug)
+  ? `Free ${offerFor[data.slug as AdService].inspectionName}`
+  : undefined;
+const schema = [
+  serviceSchema({ name: `${data.name} in ${site.city}, ${site.region}`, serviceType: data.name, description: data.metaDescription, path, image: data.image, freeOffer }),
+  faqSchema(data.faqs),
+  breadcrumbSchema(crumbs),
+  itemListSchema(`${data.name} services from ${site.name}`, data.children.map((c) => ({ name: c.name, path: `/${data.slug}/${c.slug}/` }))),
+];
+---
+
+<Layout title={data.metaTitle} description={data.metaDescription} path={path} image={data.image} schema={schema}>
+  <!-- HERO: text left, isometric visual right -->
+  <section class="relative overflow-hidden bg-navy-900 bg-blueprint grain text-white">
+    <img src="/brand/mark-white.svg" alt="" aria-hidden="true" class="pointer-events-none absolute -right-16 top-0 hidden w-[36rem] opacity-[0.04] lg:block" />
+    <div class="container-x relative grid items-center gap-10 py-14 lg:grid-cols-2 lg:py-20">
+      <div>
+        <Breadcrumbs items={crumbs} light={true} />
+        <div class="mt-5 flex items-center gap-3">
+          <span class="sheet-no sheet-no-dark" aria-hidden="true">01</span>
+          <p class="kicker text-navy-200">{data.hero.eyebrow} in {site.areaServed}</p>
+          <span class="h-px flex-1 bg-navy-200/40" aria-hidden="true"></span>
+        </div>
+        <h1 class="font-display mt-2 text-4xl font-bold uppercase leading-[0.95] tracking-tight sm:text-5xl">
+          {data.hero.title}
+        </h1>
+        <div class="rule-dim mt-4 w-24 text-orange-500" aria-hidden="true"></div>
+        <p class="mt-5 max-w-xl text-lg text-navy-100">{data.hero.intro}</p>
+        <ul class="mt-6 grid max-w-md gap-2 sm:grid-cols-2">
+          {
+            heroBullets.map((b) => (
+              <li class="flex items-center gap-2 font-display font-semibold uppercase tracking-wide text-white">
+                <Icon name="check" class="h-5 w-5 flex-shrink-0 text-orange-400" /> {b}
+              </li>
+            ))
+          }
+        </ul>
+        <div class="mt-7 flex flex-col gap-3 sm:flex-row">
+          <a href="#quote" class="btn-primary">Get a Free Estimate</a>
+          <a href={`tel:${site.phoneRaw}`} class="btn-secondary">
+            <Icon name="phone" class="h-5 w-5" /> {site.phone}
+          </a>
+        </div>
+      </div>
+
+      <!-- Visual -->
+      <div class="relative flex items-center justify-center">
+        {data.heroIllustration ? (
+          <figure class="relative w-full max-w-xl border border-white/15 bg-navy-950/40 p-6">
+            <img src={data.heroIllustration} alt={data.imageAlt} width="1280" height="1000" fetchpriority="high" decoding="async" class="w-full" />
+            <figcaption class="spec-tag mt-4">Fig. 1 <span class="text-navy-200">·</span> {data.name} system cutaway</figcaption>
+          </figure>
+        ) : (
+          <img src={data.image} srcset={webpSrcset(data.image)} sizes="(min-width: 1024px) 50vw, 100vw" alt={data.imageAlt} width="1400" height="1050" fetchpriority="high" decoding="async" class="relative aspect-[4/3] w-full rounded-none border border-white/15 object-cover" />
+        )}
+      </div>
+    </div>
+  </section>
+
+  <!-- LEAD FORM BAND -->
+  <section id="quote" class="bg-navy-900 bg-blueprint grain text-white scroll-mt-20">
+    <div class="container-x grid gap-8 py-12 lg:grid-cols-12 lg:items-center lg:gap-12 lg:py-16">
+      <div class="lg:col-span-5">
+        <p class="kicker text-orange-400">Free, no obligation</p>
+        <h2 class="mt-2 font-display text-3xl font-bold uppercase leading-[0.98] tracking-tight sm:text-4xl">
+          Get your free {data.name.toLowerCase()} estimate
+        </h2>
+        <div class="mt-5 flex items-center gap-2">
+          <span class="flex">{Array.from({ length: 5 }).map(() => <Icon name="star" class="h-5 w-5 text-orange-400" />)}</span>
+          <span class="num font-semibold">{site.rating.value} from {site.rating.count} Google reviews</span>
+        </div>
+        <ul class="mt-6 space-y-2.5">
+          {heroBullets.map((b) => (
+            <li class="flex items-center gap-2.5 text-navy-100">
+              <Icon name="check" class="h-5 w-5 flex-shrink-0 text-orange-400" /> {b}
+            </li>
+          ))}
+        </ul>
+        <a href={`tel:${site.phoneRaw}`} class="num mt-7 inline-flex items-center gap-2 font-display text-2xl font-bold text-white hover:text-orange-300">
+          <Icon name="phone" class="h-6 w-6 text-orange-400" /> {site.phone}
+        </a>
+      </div>
+
+      <!-- Form card -->
+      <div class="lg:col-span-7">
+        <div class="rounded-2xl bg-white p-6 text-slate-800 shadow-2xl ring-1 ring-black/5 sm:p-7">
+          {!formReady && (
+            <p class="mb-4 rounded-lg bg-orange-50 p-3 text-xs text-orange-700 ring-1 ring-orange-200">
+              Add a Web3Forms key in <code class="font-mono">site.ts</code> to enable this form. Until then, call or use the contact page.
+            </p>
+          )}
+          <form method="POST" action="/api/lead/" class="grid gap-3">
+            <input type="hidden" name="service_page" value={data.name} />
+            <Honeypot />
+            <div class="grid gap-3 sm:grid-cols-2">
+              <input name="name" required aria-label="Full name" autocomplete="name" placeholder="Full name" class="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-200" />
+              <input name="phone" type="tel" required aria-label="Phone number" autocomplete="tel" inputmode="tel" pattern="[0-9()+\-. ]{10,}" title="Enter a 10 digit phone number" placeholder="Phone" class="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-200" />
+              <input name="email" type="email" aria-label="Email" autocomplete="email" placeholder="Email" class="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-200" />
+              <input name="zip" aria-label="ZIP code" autocomplete="postal-code" inputmode="numeric" pattern="[0-9]{5}(-[0-9]{4})?" title="Enter a 5 digit ZIP code" placeholder="ZIP code" class="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-200" />
+            </div>
+            <div class="grid gap-3 sm:grid-cols-2">
+              <input name="address" aria-label="Street address" autocomplete="street-address" placeholder="Street address" class="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-200" />
+              <input name="city" aria-label="City" autocomplete="address-level2" placeholder="City" class="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-200" />
+            </div>
+            <select name="service" required aria-label="Service needed" class="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-slate-800 invalid:text-slate-500 focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-200">
+              <option value={data.name} selected>{data.name}</option>
+              {navServices.filter((s) => s.slug !== data.slug).map((s) => <option value={s.name}>{s.name}</option>)}
+              <option value="Multiple / Other">Multiple / Other</option>
+            </select>
+            <textarea name="message" rows="3" aria-label="How can we help?" placeholder="How can we help?" class="w-full rounded-lg border border-slate-300 px-4 py-2.5 focus:border-navy-500 focus:outline-none focus:ring-2 focus:ring-navy-200"></textarea>
+            <button type="submit" disabled={!formReady} class="btn-primary w-full disabled:cursor-not-allowed disabled:opacity-50">
+              Request My Free Quote
+            </button>
+            <p class="text-center text-xs text-slate-500">Free and no obligation. We respond fast.</p>
+            <FormConsent />
+          </form>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Sub-services (image cards) -->
+  <section class="section">
+    <div class="container-x">
+      <SectionHead no="02" kicker={`Our ${data.name.toLowerCase()} services`} title="How we help" />
+      <div class:list={['mt-12 grid gap-6 sm:grid-cols-2', data.children.length >= 3 ? 'lg:grid-cols-3' : 'lg:mx-auto lg:max-w-4xl']} data-stagger>
+        {
+          data.children.map((c, i) => (
+            <a href={`/${data.slug}/${c.slug}/`} class="group relative crops flex flex-col border border-navy-600/20 bg-white hover:border-navy-600/50">
+              <span class="absolute inset-x-0 top-0 h-0.5 origin-left scale-x-0 bg-orange-500 transition-transform duration-200 group-hover:scale-x-100" aria-hidden="true"></span>
+              <div class="aspect-[4/3] overflow-hidden">
+                <img src={c.image} srcset={cardSrcset(c.image)} sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 92vw" alt={c.imageAlt} width="1400" height="1050" loading="lazy" decoding="async" class="h-full w-full object-cover" />
+              </div>
+              <p class="spec-tag">{data.name} <span class="text-navy-200">·</span> Spec 0{i + 1}</p>
+              <div class="flex flex-1 flex-col p-6">
+                <h3 class="font-display text-xl font-bold uppercase tracking-tight text-navy-700">{c.name}</h3>
+                <p class="mt-1 text-sm text-slate-600">{c.short}</p>
+                <span class="mt-auto inline-flex items-center gap-1 pt-3 text-sm font-semibold text-navy-700 group-hover:text-orange-600">
+                  Learn more <Icon name="arrow" class="h-4 w-4 transition group-hover:translate-x-1" />
+                </span>
+              </div>
+            </a>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <!-- Quality feature row -->
+  <FeatureRow
+    eyebrow="Quality that runs deeper"
+    title={`Our ${data.name.toLowerCase()} work is more than surface-deep`}
+    image={data.featureIllustration ?? '/photos/feature/crew.jpg'}
+    imageAlt={data.featureIllustration ? `Isometric cutaway of a ${data.name.toLowerCase()} system` : 'Smart Home Improvements crew at work on a Central Valley home'}
+    illustration={!!data.featureIllustration}
+    tone="light"
+    bullets={data.benefits}
+    cta={{ href: '/contact/', label: 'Get In Touch' }}
+  >
+    <p>
+      Great work starts with great materials, but it is the craftsmanship that makes it last.
+      Over {site.yearsInBusiness} years of experience, quality materials, and a commitment to
+      getting it right the first time, for homes across {site.areaServed}.
+    </p>
+  </FeatureRow>
+
+  <!-- Inspection / approach: image + stacked cards -->
+  <section class="bg-navy-50 bg-blueprint-light py-16 sm:py-20">
+    <div class="container-x grid gap-12 lg:grid-cols-2 lg:items-center lg:gap-16">
+      <div class="relative order-2 lg:order-1">
+        <figure class="border border-navy-600/20 bg-white">
+          <img src="/photos/feature/why-us.jpg" srcset={cardSrcset('/photos/feature/why-us.jpg')} sizes="(min-width: 1024px) 45vw, 92vw" alt={`${data.name} inspection on a Central Valley home`} width="1400" height="1050" loading="lazy" decoding="async" class="aspect-[4/3] w-full object-cover" />
+          <figcaption class="spec-tag">{data.name} inspection <span class="text-navy-200">·</span> Central Valley</figcaption>
+        </figure>
+      </div>
+      <div class="order-1 lg:order-2">
+        <SectionHead kicker="Our inspection process" title="A thorough, no-guesswork check">
+          <p class="mt-4 max-w-prose text-slate-600">
+            Before any work begins, we give your home a careful, top-to-bottom look so you have total
+            clarity and can confidently choose the right next step.
+          </p>
+        </SectionHead>
+        <div class="mt-6 space-y-4" data-stagger>
+          {
+            approach.map((a) => (
+              <div class="flex gap-4 rounded-none border border-navy-600/20 bg-white p-5">
+                <span class="grid h-12 w-12 flex-shrink-0 place-items-center bg-navy-50 text-navy-700">
+                  <Icon name={a.icon} class="h-6 w-6" />
+                </span>
+                <div>
+                  <h3 class="font-display text-lg font-bold uppercase tracking-tight text-navy-700">{a.title}</h3>
+                  <p class="mt-1 text-sm text-slate-600">{a.text}</p>
+                </div>
+              </div>
+            ))
+          }
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <NamedSystem />
+
+  <!-- Materials -->
+  {data.materials && (
+    <section class="section">
+      <div class="container-x">
+        <SectionHead kicker="What we install" title={data.materialsHeading}>
+          {data.materialsIntro && <p class="mt-4 max-w-prose text-slate-600">{data.materialsIntro}</p>}
+        </SectionHead>
+        <div class="mt-12 divide-y divide-navy-600/15" data-stagger>
+          {data.materials.map((m, i) => (
+            <div class="flex items-center gap-6 py-6 transition hover:bg-navy-50 sm:gap-8">
+              <span class="num-outline select-none" aria-hidden="true">0{i + 1}</span>
+              <div class="flex-1">
+                <h3 class="font-display text-2xl font-bold uppercase tracking-tight text-navy-700">{m.name}</h3>
+                <p class="mt-1 text-slate-600">{m.text}</p>
+              </div>
+              {m.illustration ? (
+                <div class="hidden h-28 w-28 flex-shrink-0 items-center justify-center border border-navy-600/20 bg-white p-2 sm:flex">
+                  <img src={m.illustration} alt={`${m.name} cross-section illustration`} width="380" height="310" loading="lazy" decoding="async" class="h-full w-full object-contain" />
+                </div>
+              ) : (
+                <span class="hidden h-28 w-28 flex-shrink-0 place-items-center border border-navy-600/20 bg-white text-navy-700 sm:grid">
+                  <Icon name={m.icon} class="h-8 w-8" />
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  )}
+
+  <ProcessSteps heading={`We have perfected the ${data.name.toLowerCase()} process`} image={proj[0]?.image ?? data.image} />
+
+  {proj.length > 0 && (
+    <ProjectStrip
+      items={proj}
+      eyebrow="Recent work"
+      heading={`Recent ${data.name.toLowerCase()} projects`}
+      sub={`A look at ${data.name.toLowerCase()} work we have completed for Central Valley homeowners.`}
+    />
+  )}
+
+  {gallery.length > 0 && (
+    <PhotoGallery
+      items={gallery}
+      tone="muted"
+      heading={`${data.name} we have completed`}
+      sub={`Real ${data.name.toLowerCase()} jobs from homeowners across the Central Valley.`}
+    />
+  )}
+
+  {studies.length > 0 && (
+    <section class="section">
+      <div class="container-x">
+        <SectionHead kicker="Featured project" title={`See a real ${data.name.toLowerCase()} transformation`} />
+        <div class="mt-10 grid gap-6">
+          {studies.map((c) => (
+            <a href={`/projects/${c.slug}/`} class="group grid overflow-hidden rounded-none border border-navy-600/20 bg-white hover:border-navy-600/50 md:grid-cols-2">
+              <div class="aspect-[4/3] overflow-hidden md:aspect-auto">
+                <img src={c.image} srcset={cardSrcset(c.image)} sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 92vw" alt={c.imageAlt} width="1400" height="1050" loading="lazy" decoding="async" class="h-full w-full object-cover" />
+              </div>
+              <div class="flex flex-col justify-center p-7 lg:p-10">
+                <p class="kicker text-orange-700">{c.city} case study</p>
+                <h3 class="font-display mt-2 text-2xl font-bold uppercase tracking-tight text-navy-700 sm:text-3xl">{c.title}</h3>
+                <p class="mt-3 text-slate-600">{c.summary}</p>
+                <span class="mt-5 inline-flex items-center gap-1 font-semibold text-navy-700 group-hover:text-orange-600">
+                  Read the case study <Icon name="arrow" class="h-4 w-4 transition group-hover:translate-x-1" />
+                </span>
+              </div>
+            </a>
+          ))}
+        </div>
+      </div>
+    </section>
+  )}
+
+  {vsl && (
+    <section class="section bg-white">
+      <div class="container-x grid items-center gap-10 lg:grid-cols-2">
+        <div>
+          <p class="kicker text-orange-700">Watch this first</p>
+          <h2 class="h-section mt-2">{vsl.title}</h2>
+          <p class="mt-4 max-w-prose text-slate-600">
+            60 seconds of real {data.name.toLowerCase()} work and a real Central Valley customer, no script, no stock footage.
+          </p>
+          <a href="/contact/" class="btn-primary mt-7">Get a Free Estimate</a>
+        </div>
+        <div class:list={[vsl.vertical && 'mx-auto w-full max-w-[20rem]']}>
+          <video
+            controls
+            preload="none"
+            playsinline
+            poster={vsl.poster}
+            class:list={[
+              'w-full rounded-none border border-navy-600/20 bg-navy-950 object-cover',
+              vsl.vertical ? 'aspect-[9/16]' : 'aspect-video',
+            ]}
+            title={vsl.title}
+          >
+            <source src={vsl.src} type="video/mp4" />
+          </video>
+          {vsl.transcript && (
+            <details class="mt-3 text-sm text-slate-600">
+              <summary class="cursor-pointer font-semibold text-navy-700">Read the video transcript</summary>
+              <p class="mt-2 max-w-prose">{vsl.transcript}</p>
+            </details>
+          )}
+        </div>
+      </div>
+    </section>
+  )}
+
+  {vids.length > 0 && (
+    <VideoGallery
+      items={vids}
+      heading={`${data.name} on video`}
+      sub={`Watch real ${data.name.toLowerCase()} jobs and customer testimonials from our YouTube channel.`}
+    />
+  )}
+
+  <ServiceAreas service={data.name.toLowerCase()} />
+
+  <AreaLinks service={data.name.toLowerCase()} />
+
+  <Guarantee />
+
+  <Reviews />
+
+  <!-- FAQ two-column -->
+  <section class="section bg-navy-50 bg-blueprint-light">
+    <div class="container-x grid gap-10 lg:grid-cols-12 lg:gap-16">
+      <div class="lg:col-span-5">
+        <SectionHead kicker="FAQs" title={`${data.name} questions, answered`}>
+          <p class="mt-4 max-w-prose text-slate-600">
+            Still have a question about your {data.name.toLowerCase()} project? We are happy to help.
+          </p>
+        </SectionHead>
+        <div class="mt-6 flex flex-col gap-3 sm:flex-row">
+          <a href="/contact/" class="btn-primary">Ask Us Anything</a>
+          <a href={`tel:${site.phoneRaw}`} class="btn-outline">
+            <Icon name="phone" class="h-5 w-5" /> {site.phone}
+          </a>
+        </div>
+      </div>
+      <div class="lg:col-span-7">
+        <div class="divide-y divide-navy-600/15 rounded-none border border-navy-600/25 bg-white">
+          {
+            data.faqs.map((f) => (
+              <details class="group p-5">
+                <summary class="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold text-navy-900">
+                  {f.q}
+                  <Icon name="arrow" class="h-5 w-5 flex-shrink-0 text-navy-500 transition group-open:rotate-90" />
+                </summary>
+                <p class="mt-3 text-slate-600">{f.a}</p>
+              </details>
+            ))
+          }
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <PromiseBand />
+
+  <ResourceLinks service={data.name.toLowerCase() as ServiceSlug} />
+
+  <!-- Other services -->
+  <section class="section">
+    <div class="container-x">
+      <h2 class="font-display text-2xl font-bold uppercase tracking-tight text-navy-700">
+        Explore our other services
+      </h2>
+      <div class="mt-8 grid gap-6 sm:grid-cols-2" data-stagger>
+        {
+          others.map((o) => (
+            <a href={`/${o.slug}/`} class="group flex items-center gap-4 rounded-none border border-navy-600/20 bg-white p-6 hover:border-navy-600/50">
+              <span class="grid h-12 w-12 place-items-center bg-navy-50 text-navy-700">
+                <Icon name={o.icon} class="h-6 w-6" />
+              </span>
+              <span class="flex-1">
+                <span class="block font-display text-lg font-bold uppercase tracking-tight text-navy-700">{o.name}</span>
+                <span class="block text-sm text-slate-500">View service</span>
+              </span>
+              <Icon name="arrow" class="h-5 w-5 text-navy-400 transition group-hover:translate-x-1" />
+            </a>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <CtaBand heading={`Get your free ${data.name.toLowerCase()} estimate`} image={data.image} />
+</Layout>

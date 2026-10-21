@@ -1,0 +1,98 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Icon from '../components/Icon.astro';
+import Reviews from '../components/Reviews.astro';
+import CtaBand from '../components/CtaBand.astro';
+import PageHero from '../components/PageHero.astro';
+import VideoGallery from '../components/VideoGallery.astro';
+import { site } from '../data/site';
+import { videos } from '../data/videos';
+
+const values = [
+  { icon: 'star', title: 'Customer satisfaction first', text: 'Your satisfaction is our top priority on every project, start to finish.' },
+  { icon: 'check', title: 'Transparent communication', text: 'Clear timelines, honest pricing, and expert guidance, no surprises.' },
+  { icon: 'shield', title: 'Commitment to excellence', text: 'Superior craftsmanship and top-tier service, every single time.' },
+  { icon: 'map', title: 'Local expertise', text: 'Solutions tailored to the Central Valley climate by people who live here.' },
+];
+
+const stats = [
+  { value: `${site.yearsInBusiness}+`, label: 'Years of experience' },
+  { value: '3', label: 'Core services' },
+  { value: '100%', label: 'Licensed & accountable' },
+  { value: `#${site.license}`, label: 'CA contractor license' },
+];
+---
+
+<Layout
+  title="About Smart Home Improvements | Fresno, CA Contractor"
+  description="Smart Home Improvements is a licensed Fresno home improvement contractor with 10+ years of roofing, window, and insulation expertise across the Central Valley. CA #1129883."
+  path="/about/"
+>
+  <PageHero
+    imageAlt="Isometric illustration of a Central Valley home improved by Smart Home Improvements"
+    illustration="/illustrations/home-hero.svg"
+    kicker="About us"
+    title="A decade of quality home improvements in the Central Valley"
+    intro={`Smart Home Improvements is a trusted provider of premier home improvement services in ${site.city} and the Central Valley. Specializing in roofing, windows, and insulation, we bring over a decade of expertise to every project, delivering superior craftsmanship and top-tier customer service.`}
+    eager={true}
+  />
+
+  <section class="section">
+    <div class="container-x grid gap-12 lg:grid-cols-2 lg:items-center">
+      <div>
+        <h2 class="h-section">Built on craftsmanship and trust</h2>
+        <p class="prose-content mt-4 text-slate-700">
+          We help Central Valley homeowners transform their houses into more functional, beautiful,
+          and efficient spaces, whether that means protecting your home with a durable new roof,
+          cutting energy bills with efficient windows, or improving year-round comfort with quality
+          insulation.
+        </p>
+        <p class="prose-content text-slate-700">
+          Our team uses only the highest-quality materials and proven techniques, with solutions
+          tailored to our region's demanding climate. As licensed professionals, we complete projects
+          on time and within budget, and we treat your home with the same care we'd give our own.
+        </p>
+        <div class="mt-6 flex flex-col gap-3 sm:flex-row">
+          <a href="/contact/" class="btn-outline">Get a Free Quote</a>
+          <a href={`tel:${site.phoneRaw}`} class="btn inline-flex border-2 border-slate-200 text-navy-800 hover:bg-slate-50">
+            <Icon name="phone" class="h-5 w-5" /> {site.phone}
+          </a>
+        </div>
+      </div>
+      <dl class="grid grid-cols-2 gap-4">
+        {
+          stats.map((s) => (
+            <div class="rounded-2xl bg-slate-50 p-6 text-center">
+              <dt class="text-3xl font-display font-bold uppercase text-navy-700">{s.value}</dt>
+              <dd class="mt-1 text-sm text-slate-600">{s.label}</dd>
+            </div>
+          ))
+        }
+      </dl>
+    </div>
+  </section>
+
+  <section class="bg-slate-50 py-16 sm:py-20">
+    <div class="container-x">
+      <h2 class="h-section text-center">What we stand for</h2>
+      <div class="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        {
+          values.map((v) => (
+            <div class="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+              <span class="grid h-12 w-12 place-items-center rounded-xl bg-navy-50 text-navy-700">
+                <Icon name={v.icon} class="h-6 w-6" />
+              </span>
+              <h3 class="mt-4 font-bold text-navy-900">{v.title}</h3>
+              <p class="mt-2 text-sm text-slate-600">{v.text}</p>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <VideoGallery items={videos} heading="See us in action" sub="A look at our team and real jobs from our YouTube channel." />
+
+  <Reviews />
+  <CtaBand />
+</Layout>

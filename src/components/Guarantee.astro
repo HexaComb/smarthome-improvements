@@ -1,0 +1,42 @@
+---
+import Icon from './Icon.astro';
+import SectionHead from './SectionHead.astro';
+import Seal from './Seal.astro';
+import { site } from '../data/site';
+
+// Same three named standards as NamedSystem ("The Smart Home Standard"), so
+// hubs, home, city, and project pages all reinforce one system homeowners can
+// ask for by name.
+const guarantees = [
+  { icon: 'shield', title: 'Home Shield', text: `Landscaping, driveway, and interiors covered and protected before the first tool comes out. Licensed CA contractor #${site.license}.` },
+  { icon: 'check', title: 'Magnet-Swept Cleanup', text: 'Cleaned every day we are on site, finished with a magnetic sweep of your yard and driveway so no nail is left behind.' },
+  { icon: 'roof', title: 'Photo-Documented Work', text: 'Your inspection and finished job come with photos, so you see what we saw and what we did, not just a bill.' },
+];
+---
+
+<section class="bg-navy-900 bg-blueprint grain py-16 text-white sm:py-20">
+  <div class="container-x">
+    <div class="flex items-start gap-10">
+      <SectionHead tone="dark" kicker="Our guarantee" title="Our get-it-right guarantee" class="min-w-0 flex-1">
+        <p class="mt-4 max-w-prose text-navy-100">
+          We stand behind every roof, window, and insulation job. If something is not right, we make
+          it right.
+        </p>
+      </SectionHead>
+      <Seal variant="navy" class="hidden h-36 w-36 flex-shrink-0 text-orange-400 lg:block" />
+    </div>
+    <div class="mt-12 grid gap-8 md:grid-cols-3" data-stagger>
+      {
+        guarantees.map((g) => (
+          <div class="rounded-none border border-white/15 bg-navy-900/60 p-6">
+            <span class="grid h-12 w-12 place-items-center bg-white/10 text-orange-400">
+              <Icon name={g.icon} class="h-6 w-6" />
+            </span>
+            <h3 class="font-display mt-4 text-lg font-bold uppercase tracking-tight text-white">{g.title}</h3>
+            <p class="mt-2 num text-sm text-navy-100">{g.text}</p>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</section>
